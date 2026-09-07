@@ -1,41 +1,58 @@
-# Jhulie Ecom AI System V2
+# JHULIE ECOM AI SYSTEM — PUBLIC EDITION
 
-**AI Operating System for Ecommerce**
+**A camada pública da minha lógica operacional, transformada em agentes para ecommerce.**
 
-Um sistema de agentes, skills, comandos e workflows para operar ecommerce com Claude Code.
+Este projeto não é um pack de prompts.
 
-> Não é uma biblioteca de prompts. É uma arquitetura operacional.
+É uma arquitetura operacional para Claude Code com agentes especializados, commands, skills e workflows para ecommerce.
 
----
-
-## O que este sistema resolve
-
-O V2 foi desenhado para transformar IA em uma camada de operação real para ecommerce:
-
-- diagnóstico da operação;
-- leitura de métricas e funil;
-- CRO e otimização de loja;
-- personalização segura de tema Shopify;
-- Meta Ads;
-- Google Ads;
-- tracking e qualidade de sinal;
-- SEO ecommerce;
-- inteligência competitiva;
-- SAC;
-- relatórios diários;
-- workflows com separação entre análise, decisão e execução.
+> A Public Edition entrega uma parte prática e funcional da forma como eu estruturo análise e operação com IA. A versão completa — com metodologia proprietária, playbooks internos, integrações avançadas, automações e infraestrutura de execução — é reservada às camadas privadas do ecossistema Jhulie Ecom.
 
 ---
 
-## Arquitetura
+## O que você recebe nesta edição
+
+- agentes executáveis para Claude Code;
+- comandos rápidos;
+- skills reutilizáveis;
+- workflows públicos;
+- regras de integridade de dados;
+- segurança de execução;
+- exemplos de uso;
+- arquitetura preparada para evoluir com integrações reais.
+
+---
+
+## A ideia
+
+Você não está recebendo uma IA genérica.
+
+Está recebendo uma **camada pública da minha lógica operacional aplicada a ecommerce** — organizada em especialistas que trabalham dentro do seu projeto.
+
+Os agentes usam uma identidade discreta:
+
+```text
+JHULIE // DIRECTOR
+JHULIE // STORE ANALYST
+JHULIE // META BUYER
+JHULIE // GOOGLE BUYER
+JHULIE // TRACKING ANALYST
+JHULIE // SEO COMMERCE
+```
+
+O nome técnico continua simples para o Claude Code. O prefixo `JHULIE //` é a identidade do sistema, não um comando diferente.
+
+---
+
+## Arquitetura pública
 
 ```text
 DADOS
-Shopify + GA4 + Meta + Google + arquivos/contexto
+Shopify / GA4 / Meta / Google / arquivos / contexto
                      ↓
                STORE ANALYST
                      ↓
-            DIRETOR DA OPERAÇÃO
+               JHULIE // DIRECTOR
                      ↓
         ESPECIALISTA RESPONSÁVEL
       ↙       ↓        ↓        ↘
@@ -44,12 +61,12 @@ Shopify + GA4 + Meta + Google + arquivos/contexto
  THEME     META / GOOGLE
  ENGINEER
                      ↓
-            EXECUÇÃO / TESTE
+        EXECUÇÃO ASSISTIDA / TESTE
                      ↓
                NOVOS DADOS
 ```
 
-O sistema trabalha em loop:
+Princípio:
 
 **DADOS → DIAGNÓSTICO → PRIORIDADE → EXECUÇÃO → VALIDAÇÃO**
 
@@ -57,27 +74,27 @@ O sistema trabalha em loop:
 
 ## Agentes executáveis
 
-Os subagentes vivem em `.claude/agents/`.
+Os agentes ficam em `.claude/agents/`.
 
-| Agente | Função |
-|---|---|
-| `diretor-operacao` | Prioridade estratégica e coordenação |
-| `store-analyst` | Métricas, funil e saúde da operação |
-| `store-optimizer` | CRO, UX, PDP, coleção e conversão |
-| `theme-engineer` | Shopify theme, Liquid, CSS, JS e implementação |
-| `traffic-director` | Alocação e leitura consolidada de mídia |
-| `meta-media-buyer` | Meta Ads |
-| `google-media-buyer` | Search, Shopping e PMax |
-| `tracking-analyst` | GA4, Meta Pixel/CAPI e Google tracking |
-| `seo-commerce` | SEO de produtos, coleções e arquitetura |
-| `competitor-intelligence` | Concorrentes, ofertas, ads e funnels |
-| `sac-operator` | Atendimento ecommerce |
+| Identidade | Nome técnico | Função |
+|---|---|---|
+| JHULIE // DIRECTOR | `diretor-operacao` | Prioridade estratégica e coordenação |
+| JHULIE // STORE ANALYST | `store-analyst` | Métricas, funil e saúde da operação |
+| JHULIE // STORE OPTIMIZER | `store-optimizer` | CRO, UX, PDP, coleções e conversão |
+| JHULIE // THEME ENGINEER | `theme-engineer` | Shopify theme, Liquid, CSS e JS |
+| JHULIE // TRAFFIC DIRECTOR | `traffic-director` | Leitura consolidada de mídia e verba |
+| JHULIE // META BUYER | `meta-media-buyer` | Meta Ads |
+| JHULIE // GOOGLE BUYER | `google-media-buyer` | Search, Shopping e PMax |
+| JHULIE // TRACKING ANALYST | `tracking-analyst` | GA4, Meta Pixel/CAPI e Google tracking |
+| JHULIE // SEO COMMERCE | `seo-commerce` | SEO de produtos, coleções e arquitetura |
+| JHULIE // COMPETITOR INTELLIGENCE | `competitor-intelligence` | Concorrentes, ads, oferta e funnel |
+| JHULIE // SAC OPERATOR | `sac-operator` | Atendimento ecommerce |
 
 ---
 
 ## Commands
 
-Atalhos práticos em `.claude/commands/`:
+Atalhos disponíveis em `.claude/commands/`:
 
 ```text
 /diagnosticar-operacao
@@ -97,7 +114,7 @@ Atalhos práticos em `.claude/commands/`:
 
 ## Skills
 
-O V2 também usa skills nativas do Claude Code em `.claude/skills/`.
+Skills reutilizáveis em `.claude/skills/`:
 
 ```text
 /cro-audit
@@ -108,8 +125,6 @@ O V2 também usa skills nativas do Claude Code em `.claude/skills/`.
 /competitor-research
 /daily-ops-report
 ```
-
-Skills são procedimentos reutilizáveis. O Claude pode carregá-las quando forem relevantes ou você pode chamá-las diretamente.
 
 ---
 
@@ -142,7 +157,7 @@ Dentro do Claude Code:
 
 ## Primeiros testes
 
-### Diagnóstico geral
+### Diagnóstico da operação
 
 ```text
 /diagnosticar-operacao
@@ -168,16 +183,16 @@ MER: 2,48
 /auditar-loja https://sua-loja.com/products/produto
 ```
 
-Veja mais exemplos na pasta `examples/`.
+Veja mais em `examples/`.
 
 ---
 
-## Como o sistema trata dados reais
+## O que esta edição NÃO promete
 
-Os agentes **não possuem acesso mágico** às suas contas.
+Os agentes não possuem acesso mágico às suas contas.
 
-Sem integração, eles trabalham com:
-- dados fornecidos no chat;
+Sem integração real, eles trabalham com:
+- dados que você fornecer;
 - arquivos locais;
 - páginas públicas acessíveis;
 - contexto do projeto.
@@ -185,24 +200,36 @@ Sem integração, eles trabalham com:
 Com backend, APIs ou MCP configurados, eles podem trabalhar com dados reais dentro das permissões concedidas.
 
 O sistema nunca deve afirmar que:
-- leu uma conta que não estava conectada;
+- leu uma conta não conectada;
 - alterou campanha sem API/tool;
 - publicou tema sem execução real;
 - enviou mensagem sem integração.
 
 ---
 
+## Public Edition vs. estrutura privada
+
+Esta versão foi criada para compartilhar valor real sem publicar toda a estrutura proprietária.
+
+A Public Edition **não inclui**:
+- metodologia Jhulie completa;
+- thresholds e critérios privados de escala;
+- playbooks internos;
+- executores avançados de mídia;
+- backend Shopify completo;
+- automações privadas;
+- infraestrutura completa usada nas camadas de mentoria.
+
+---
+
 ## Segurança
 
-Antes de colocar o sistema em produção:
-
 - não versione `.env`;
-- nunca coloque tokens/API keys nos prompts ou no Git;
+- nunca coloque API keys ou tokens no Git;
 - use permissões mínimas;
 - mantenha mudanças de tema reversíveis;
 - mudanças financeiras exigem autorização;
-- valide tracking antes de automatizar decisões;
-- mantenha humano no loop para ações sensíveis.
+- valide tracking antes de automatizar decisões.
 
 Leia:
 - `core/policies/data-integrity.md`
@@ -210,34 +237,23 @@ Leia:
 
 ---
 
-## Workflows
-
-A pasta `core/workflows/` documenta a lógica operacional:
-
-1. operação diária;
-2. gestão de tráfego;
-3. otimização de loja e tema;
-4. SEO ecommerce.
-
----
-
 ## Documentação
 
-- **Guia de uso:** `README_USO.md`
-- **Regras do Claude Code:** `CLAUDE.md`
-- **Exemplos:** `examples/`
-- **Histórico:** `CHANGELOG.md`
+- Guia de uso: `README_USO.md`
+- Instruções do projeto: `CLAUDE.md`
+- Exemplos: `examples/`
+- Roadmap: `ROADMAP.md`
 
 ---
 
 ## Status
 
-**V2 Alpha**
+**PUBLIC EDITION — V2 Alpha**
 
-A fundação operacional está pronta. As próximas camadas incluem integrações reais, backend Shopify, automações de relatório e execução assistida em plataformas externas.
+A fundação pública está pronta para diagnóstico, análise e execução assistida. Integrações reais e automações avançadas pertencem às próximas camadas do ecossistema.
 
 ---
 
-## Princípio do projeto
+## Princípio
 
-> **IA sem dado é hipótese. IA com dado, processo e ação vira operação.**
+> **Uma camada pública da minha lógica operacional. Dentro da sua operação.**
