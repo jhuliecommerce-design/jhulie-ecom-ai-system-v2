@@ -78,7 +78,7 @@ Os agentes ficam em `.claude/agents/`.
 
 | Identidade | Nome técnico | Função |
 |---|---|---|
-| JHULIE // DIRECTOR | `diretor-operacao` | Prioridade estratégica e coordenação |
+| JHULIE // DIRECTOR | `diretor-operacao` | Prioridade estratégica, conflitos e coordenação |
 | JHULIE // STORE ANALYST | `store-analyst` | Métricas, funil e saúde da operação |
 | JHULIE // STORE OPTIMIZER | `store-optimizer` | CRO, UX, PDP, coleções e conversão |
 | JHULIE // THEME ENGINEER | `theme-engineer` | Shopify theme, Liquid, CSS e JS |
@@ -97,6 +97,7 @@ Os agentes ficam em `.claude/agents/`.
 Atalhos disponíveis em `.claude/commands/`:
 
 ```text
+/jhulie-daily
 /diagnosticar-operacao
 /auditar-loja
 /otimizar-pdp
@@ -109,6 +110,17 @@ Atalhos disponíveis em `.claude/commands/`:
 /analisar-concorrente
 /responder-sac
 ```
+
+### JHULIE DAILY
+Use `/jhulie-daily` para fazer um check-up rápido da operação.
+
+Você não precisa preencher um formulário completo. Pode usar:
+- um screenshot;
+- um CSV/export;
+- algumas métricas principais;
+- uma observação do que está acontecendo.
+
+O sistema começa com o que estiver disponível e só deve pedir 1–3 dados adicionais quando forem realmente necessários.
 
 ---
 
@@ -157,6 +169,19 @@ Dentro do Claude Code:
 
 ## Primeiros testes
 
+### JHULIE DAILY
+
+```text
+/jhulie-daily
+
+Receita: $8.300
+Pedidos: 118
+CVR: 1,2%
+Meta spend: $2.100
+Google spend: $900
+Observação: mobile caiu bastante nos últimos dias.
+```
+
 ### Diagnóstico da operação
 
 ```text
@@ -184,6 +209,26 @@ MER: 2,48
 ```
 
 Veja mais em `examples/`.
+
+---
+
+## Demo WOW
+
+Quer entender rapidamente o nível de raciocínio do sistema?
+
+Abra `examples/demo-wow.md` e rode o cenário proposto com `/diagnosticar-operacao`.
+
+A demo foi desenhada para testar se o JHULIE // DIRECTOR evita uma decisão precipitada de mídia ao perceber sinais de tracking inconsistente e queda de conversão mobile.
+
+Todos os dados da demo são fictícios e educacionais.
+
+---
+
+## Input sem fricção
+
+Veja `examples/00-quick-input.md`.
+
+O sistema foi desenhado para começar com o que você tiver: print, export, métricas principais ou contexto. Não para transformar análise em preenchimento de formulário.
 
 ---
 
@@ -241,6 +286,8 @@ Leia:
 
 - Guia de uso: `README_USO.md`
 - Instruções do projeto: `CLAUDE.md`
+- Quick input: `examples/00-quick-input.md`
+- Demo WOW: `examples/demo-wow.md`
 - Exemplos: `examples/`
 - Roadmap: `ROADMAP.md`
 
