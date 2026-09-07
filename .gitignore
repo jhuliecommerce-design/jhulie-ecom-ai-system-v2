@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+
+# Build / cache
+dist/
+build/
+.cache/
+.tmp/
+.DS_Store
+
+# Logs
+*.log
+
+# Local Claude settings that may contain user-specific permissions
+.claude/settings.local.json
