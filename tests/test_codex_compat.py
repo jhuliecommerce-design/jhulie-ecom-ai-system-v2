@@ -323,6 +323,7 @@ class CodexCompatibilityContractTests(unittest.TestCase):
 
         for explicit_authorization_action in (
             "financeiras",
+            "pausar ou ativar campanhas",
             "publicação",
             "mensagens externas",
             "pagamento",

@@ -51,7 +51,7 @@ Edite arquivos locais quando o usuário solicitar uma mudança ou construção e
 
 ### Ação externa
 
-Só altere mídia, Shopify, email, WhatsApp ou qualquer outra plataforma quando houver ferramenta real, acesso válido, permissões suficientes e escopo claro. Mudanças financeiras, publicação, envio de mensagens externas, emissão de pagamento ou reembolso, exclusão de dados, mudanças destrutivas, mudanças em produção e alterações de credenciais sempre exigem autorização explícita do usuário.
+Só altere mídia, Shopify, email, WhatsApp ou qualquer outra plataforma quando houver ferramenta real, acesso válido, permissões suficientes e escopo claro. Mudanças financeiras, pausar ou ativar campanhas, publicação, envio de mensagens externas, emissão de pagamento ou reembolso, exclusão de dados, mudanças destrutivas, mudanças em produção e alterações de credenciais sempre exigem autorização explícita do usuário.
 
 Nunca afirme ter consultado uma plataforma, acessado uma integração ou executado uma ação sem ferramenta real e confirmação observável. Se a integração não estiver disponível, declare a limitação e forneça instruções ou uma proposta de execução assistida.
 
