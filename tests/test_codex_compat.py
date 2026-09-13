@@ -13,19 +13,22 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-EXPECTED_AGENT_NAMES = (
-    "competitor-intelligence",
-    "diretor-operacao",
-    "google-media-buyer",
-    "meta-media-buyer",
-    "sac-operator",
-    "seo-commerce",
-    "store-analyst",
-    "store-optimizer",
-    "theme-engineer",
-    "tracking-analyst",
-    "traffic-director",
-)
+EXPECTED_AGENT_FILE_TO_NAME = {
+    "competitor-intelligence": "competitor_intelligence",
+    "diretor-operacao": "diretor_operacao",
+    "google-media-buyer": "google_media_buyer",
+    "meta-media-buyer": "meta_media_buyer",
+    "sac-operator": "sac_operator",
+    "seo-commerce": "seo_commerce",
+    "store-analyst": "store_analyst",
+    "store-optimizer": "store_optimizer",
+    "theme-engineer": "theme_engineer",
+    "tracking-analyst": "tracking_analyst",
+    "traffic-director": "traffic_director",
+}
+
+EXPECTED_AGENT_FILE_STEMS = tuple(EXPECTED_AGENT_FILE_TO_NAME)
+EXPECTED_AGENT_NAMES = tuple(EXPECTED_AGENT_FILE_TO_NAME.values())
 
 EXPECTED_REUSABLE_SKILL_NAMES = (
     "competitor-research",
@@ -176,8 +179,34 @@ class FrontmatterParserTests(unittest.TestCase):
 
 
 class CodexCompatibilityContractTests(unittest.TestCase):
+    def test_codex_agent_names_use_approved_snake_case(self) -> None:
+        approved_names = (
+            "competitor_intelligence",
+            "diretor_operacao",
+            "google_media_buyer",
+            "meta_media_buyer",
+            "sac_operator",
+            "seo_commerce",
+            "store_analyst",
+            "store_optimizer",
+            "theme_engineer",
+            "tracking_analyst",
+            "traffic_director",
+        )
+        self.assertEqual(EXPECTED_AGENT_NAMES, approved_names)
+
+    def test_agent_file_stems_map_to_snake_case_names(self) -> None:
+        for file_stem, agent_name in EXPECTED_AGENT_FILE_TO_NAME.items():
+            with self.subTest(file_stem=file_stem, agent_name=agent_name):
+                self.assertRegex(file_stem, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+                self.assertRegex(agent_name, r"^[a-z][a-z0-9_]*$")
+                self.assertEqual(agent_name, file_stem.replace("-", "_"))
+
     def test_contract_has_expected_number_of_adapters(self) -> None:
+        self.assertEqual(len(EXPECTED_AGENT_FILE_STEMS), 11)
         self.assertEqual(len(EXPECTED_AGENT_NAMES), 11)
+        self.assertEqual(len(set(EXPECTED_AGENT_FILE_STEMS)), 11)
+        self.assertEqual(len(set(EXPECTED_AGENT_NAMES)), 11)
         self.assertEqual(len(EXPECTED_REUSABLE_SKILL_NAMES), 7)
         self.assertEqual(len(EXPECTED_COMMAND_SKILL_NAMES), 12)
         self.assertEqual(len(set(EXPECTED_SKILL_NAMES)), 19)
@@ -191,10 +220,10 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                 )
 
     def test_expected_codex_agents_are_valid_toml(self) -> None:
-        for agent_name in EXPECTED_AGENT_NAMES:
-            relative_path = Path(".codex") / "agents" / f"{agent_name}.toml"
+        for file_stem, agent_name in EXPECTED_AGENT_FILE_TO_NAME.items():
+            relative_path = Path(".codex") / "agents" / f"{file_stem}.toml"
             path = REPO_ROOT / relative_path
-            with self.subTest(agent=agent_name):
+            with self.subTest(file_stem=file_stem, agent_name=agent_name):
                 self.assertTrue(path.is_file(), f"missing Codex agent: {relative_path}")
                 try:
                     document = tomllib.loads(path.read_text(encoding="utf-8"))
