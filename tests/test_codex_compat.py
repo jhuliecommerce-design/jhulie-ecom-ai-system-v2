@@ -751,6 +751,49 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                     f"missing Codex entrypoint document: {relative_path}",
                 )
 
+    def test_codex_guide_documents_installation_discovery_and_limits(self) -> None:
+        path = REPO_ROOT / "README_CODEX.md"
+        self.assertTrue(path.is_file(), "missing Codex usage guide: README_CODEX.md")
+
+        guide = path.read_text(encoding="utf-8")
+        normalized = guide.casefold()
+        for marker in (
+            "git clone",
+            "codex",
+            "/skills",
+            ".agents/skills",
+            ".codex/agents",
+            "diretor_operacao",
+            "examples/demo-wow.md",
+            "python scripts/validate_codex_compat.py",
+            "não possui acesso mágico",
+            "integração real",
+            "autorização explícita",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker.casefold(), normalized)
+
+        for skill_name in EXPECTED_SKILL_NAMES:
+            with self.subTest(skill=skill_name):
+                self.assertIn(f"${skill_name}", guide)
+
+    def test_shared_readmes_present_both_hosts_without_hiding_claude_usage(self) -> None:
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        usage = (REPO_ROOT / "README_USO.md").read_text(encoding="utf-8")
+
+        for document_name, document in (("README.md", readme), ("README_USO.md", usage)):
+            normalized = document.casefold()
+            with self.subTest(document=document_name, host="Claude Code"):
+                self.assertIn("claude code", normalized)
+                self.assertIn("/diagnosticar-operacao", document)
+            with self.subTest(document=document_name, host="Codex"):
+                self.assertIn("codex", normalized)
+                self.assertIn("$diagnosticar-operacao", document)
+                self.assertIn("README_CODEX.md", document)
+
+        self.assertIn("CLAUDE.md", readme)
+        self.assertIn("AGENTS.md", readme)
+
     def test_agents_md_defines_public_edition_operating_contract(self) -> None:
         path = REPO_ROOT / "AGENTS.md"
         self.assertTrue(path.is_file(), "missing Codex project instructions: AGENTS.md")
