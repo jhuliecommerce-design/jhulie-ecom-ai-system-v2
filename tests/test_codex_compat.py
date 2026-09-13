@@ -1,0 +1,297 @@
+"""Compatibility contract for the dual-native Claude/Codex distribution."""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import tempfile
+import tomllib
+import unittest
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+EXPECTED_AGENT_NAMES = (
+    "competitor-intelligence",
+    "diretor-operacao",
+    "google-media-buyer",
+    "meta-media-buyer",
+    "sac-operator",
+    "seo-commerce",
+    "store-analyst",
+    "store-optimizer",
+    "theme-engineer",
+    "tracking-analyst",
+    "traffic-director",
+)
+
+EXPECTED_REUSABLE_SKILL_NAMES = (
+    "competitor-research",
+    "cro-audit",
+    "daily-ops-report",
+    "media-buying",
+    "pdp-optimization",
+    "seo-product",
+    "tracking-audit",
+)
+
+EXPECTED_COMMAND_SKILL_NAMES = (
+    "analisar-concorrente",
+    "auditar-loja",
+    "auditar-seo",
+    "decidir-verba",
+    "diagnosticar-google",
+    "diagnosticar-meta",
+    "diagnosticar-operacao",
+    "jhulie-daily",
+    "otimizar-pdp",
+    "otimizar-tema",
+    "responder-sac",
+    "revisar-tracking",
+)
+
+EXPECTED_SKILL_NAMES = (
+    EXPECTED_REUSABLE_SKILL_NAMES + EXPECTED_COMMAND_SKILL_NAMES
+)
+
+FRONTMATTER_KEY = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
+YAML_NON_STRING_SCALAR = re.compile(
+    r"(?:null|true|false|yes|no|on|off|~|[-+]?\d[\d._]*(?:e[-+]?\d+)?)\Z",
+    re.IGNORECASE,
+)
+
+
+def parse_frontmatter_scalar(value: str) -> str:
+    """Parse the strict string-scalar subset accepted by this contract."""
+    value = value.strip()
+    if not value:
+        raise ValueError("frontmatter values cannot be empty")
+
+    if value.startswith('"'):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"invalid double-quoted scalar: {value!r}") from error
+        if not isinstance(parsed, str):
+            raise ValueError(f"frontmatter scalar must be a string: {value!r}")
+        return parsed
+
+    if value.startswith("'"):
+        if len(value) < 2 or not value.endswith("'"):
+            raise ValueError(f"unterminated single-quoted scalar: {value!r}")
+        inner = value[1:-1]
+        if re.fullmatch(r"(?:[^']|'')*", inner) is None:
+            raise ValueError(f"invalid single-quoted scalar: {value!r}")
+        return inner.replace("''", "'")
+
+    if value.endswith(("'", '"')):
+        raise ValueError(f"unmatched quote in scalar: {value!r}")
+    if value.endswith(":"):
+        raise ValueError(f"unsupported terminal mapping indicator: {value!r}")
+    if value[0] in "-?:,[]{}#&*!|>'\"%@`":
+        raise ValueError(f"unsupported YAML scalar indicator: {value!r}")
+    if ": " in value or ":\t" in value or " #" in value or "\t" in value:
+        raise ValueError(f"ambiguous plain YAML scalar: {value!r}")
+    if YAML_NON_STRING_SCALAR.fullmatch(value):
+        raise ValueError(f"frontmatter scalar must be a string: {value!r}")
+    return value
+
+
+def read_frontmatter(path: Path) -> dict[str, str]:
+    """Read the scalar YAML frontmatter fields used by Codex skills."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0] != "---":
+        raise ValueError("frontmatter must start with '---'")
+
+    fields: dict[str, str] = {}
+    for line in lines[1:]:
+        if line == "---":
+            return fields
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0].isspace():
+            raise ValueError(f"frontmatter keys must start at column zero: {line!r}")
+        key, separator, value = line.partition(":")
+        key = key.strip()
+        if (
+            not separator
+            or FRONTMATTER_KEY.fullmatch(key) is None
+            or not value.strip()
+        ):
+            raise ValueError(f"invalid scalar frontmatter line: {line!r}")
+        if key in fields:
+            raise ValueError(f"duplicate frontmatter key: {key!r}")
+        fields[key] = parse_frontmatter_scalar(value)
+
+    raise ValueError("frontmatter must end with '---'")
+
+
+class FrontmatterParserTests(unittest.TestCase):
+    def test_rejects_frontmatter_outside_supported_scalar_yaml_subset(self) -> None:
+        invalid_documents = {
+            "unterminated quote": "---\nname: 'broken\ndescription: valid\n---\n",
+            "duplicate key": "---\nname: first\nname: second\ndescription: valid\n---\n",
+            "flow collection": "---\nname: valid\ndescription: [broken\n---\n",
+            "block scalar": "---\nname: valid\ndescription: >\n  broken\n---\n",
+            "indented key": "---\nname: valid\n  description: broken\n---\n",
+            "terminal mapping indicator": (
+                "---\nname: valid\ndescription: broken:\n---\n"
+            ),
+            "indented opening delimiter": (
+                " ---\nname: valid\ndescription: broken\n---\n"
+            ),
+            "indented closing delimiter": (
+                "---\nname: valid\ndescription: broken\n ---\n"
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SKILL.md"
+            for scenario, document in invalid_documents.items():
+                with self.subTest(scenario=scenario):
+                    path.write_text(document, encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        read_frontmatter(path)
+
+    def test_parses_plain_and_quoted_scalar_fields(self) -> None:
+        document = (
+            "---\n"
+            "name: competitor-research\n"
+            'description: "Analyze competitors: positioning and offers."\n'
+            "audience: 'operator''s team'\n"
+            "---\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SKILL.md"
+            path.write_text(document, encoding="utf-8")
+            self.assertEqual(
+                read_frontmatter(path),
+                {
+                    "name": "competitor-research",
+                    "description": "Analyze competitors: positioning and offers.",
+                    "audience": "operator's team",
+                },
+            )
+
+
+class CodexCompatibilityContractTests(unittest.TestCase):
+    def test_contract_has_expected_number_of_adapters(self) -> None:
+        self.assertEqual(len(EXPECTED_AGENT_NAMES), 11)
+        self.assertEqual(len(EXPECTED_REUSABLE_SKILL_NAMES), 7)
+        self.assertEqual(len(EXPECTED_COMMAND_SKILL_NAMES), 12)
+        self.assertEqual(len(set(EXPECTED_SKILL_NAMES)), 19)
+
+    def test_codex_entrypoint_documents_exist(self) -> None:
+        for relative_path in ("AGENTS.md", "README_CODEX.md"):
+            with self.subTest(path=relative_path):
+                self.assertTrue(
+                    (REPO_ROOT / relative_path).is_file(),
+                    f"missing Codex entrypoint document: {relative_path}",
+                )
+
+    def test_expected_codex_agents_are_valid_toml(self) -> None:
+        for agent_name in EXPECTED_AGENT_NAMES:
+            relative_path = Path(".codex") / "agents" / f"{agent_name}.toml"
+            path = REPO_ROOT / relative_path
+            with self.subTest(agent=agent_name):
+                self.assertTrue(path.is_file(), f"missing Codex agent: {relative_path}")
+                try:
+                    document = tomllib.loads(path.read_text(encoding="utf-8"))
+                except tomllib.TOMLDecodeError as error:
+                    self.fail(f"invalid TOML in {relative_path}: {error}")
+
+                for required_field in (
+                    "name",
+                    "description",
+                    "developer_instructions",
+                ):
+                    self.assertIsInstance(
+                        document.get(required_field),
+                        str,
+                        f"{relative_path} requires string field {required_field!r}",
+                    )
+                    self.assertTrue(
+                        document[required_field].strip(),
+                        f"{relative_path} has empty field {required_field!r}",
+                    )
+                self.assertEqual(document["name"], agent_name)
+
+    def test_expected_codex_skills_have_valid_frontmatter(self) -> None:
+        for skill_name in EXPECTED_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                try:
+                    frontmatter = read_frontmatter(path)
+                except ValueError as error:
+                    self.fail(f"invalid frontmatter in {relative_path}: {error}")
+
+                self.assertEqual(frontmatter.get("name"), skill_name)
+                self.assertTrue(
+                    frontmatter.get("description", "").strip(),
+                    f"{relative_path} requires a non-empty description",
+                )
+
+    def test_codex_adapters_do_not_contain_claude_arguments_placeholder(self) -> None:
+        adapter_paths: list[Path] = []
+        for adapter_root in (REPO_ROOT / ".agents", REPO_ROOT / ".codex"):
+            if not adapter_root.exists():
+                continue
+            adapter_paths.extend(path for path in adapter_root.rglob("*") if path.is_file())
+        agents_md = REPO_ROOT / "AGENTS.md"
+        if agents_md.is_file():
+            adapter_paths.append(agents_md)
+
+        for path in adapter_paths:
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                self.assertNotIn(
+                    "$ARGUMENTS",
+                    path.read_text(encoding="utf-8"),
+                    f"Claude placeholder remains in {path.relative_to(REPO_ROOT)}",
+                )
+
+    def test_claude_surface_matches_origin_main(self) -> None:
+        self.assertTrue((REPO_ROOT / "CLAUDE.md").is_file())
+        self.assertTrue((REPO_ROOT / ".claude").is_dir())
+
+        baseline = subprocess.run(
+            ["git", "rev-parse", "--verify", "origin/main^{commit}"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            baseline.returncode,
+            0,
+            f"origin/main is required for the compatibility baseline: {baseline.stderr}",
+        )
+
+        diff = subprocess.run(
+            [
+                "git",
+                "diff",
+                "--exit-code",
+                "--name-status",
+                "origin/main",
+                "--",
+                ".claude",
+                "CLAUDE.md",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            diff.returncode,
+            0,
+            "Claude surface differs from origin/main:\n"
+            f"{diff.stdout}{diff.stderr}",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
