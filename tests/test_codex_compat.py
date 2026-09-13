@@ -288,6 +288,64 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                     f"missing Codex entrypoint document: {relative_path}",
                 )
 
+    def test_agents_md_defines_public_edition_operating_contract(self) -> None:
+        path = REPO_ROOT / "AGENTS.md"
+        self.assertTrue(path.is_file(), "missing Codex project instructions: AGENTS.md")
+
+        instructions = path.read_text(encoding="utf-8")
+        normalized = instructions.casefold()
+
+        for required_text in (
+            "JHULIE ECOM AI SYSTEM",
+            "PUBLIC EDITION",
+            "DADOS → DIAGNÓSTICO → PRIORIDADE → ESPECIALISTA → "
+            "EXECUÇÃO ASSISTIDA → VALIDAÇÃO",
+            "FATO",
+            "HIPÓTESE",
+            "RECOMENDAÇÃO",
+            "EXECUTADO",
+            "Consultivo",
+            "Implementação local",
+            "Ação externa",
+        ):
+            with self.subTest(required_text=required_text):
+                self.assertIn(required_text.casefold(), normalized)
+
+        for agent_name in EXPECTED_AGENT_NAMES:
+            with self.subTest(agent_name=agent_name):
+                self.assertIn(f"`{agent_name}`", instructions)
+
+        for decision_input in ("screenshots", "CSVs", "métricas", "contexto"):
+            with self.subTest(decision_input=decision_input):
+                self.assertIn(decision_input.casefold(), normalized)
+        self.assertRegex(normalized, r"1\s*[–-]\s*3")
+        self.assertIn("mudem a decisão", normalized)
+
+        for explicit_authorization_action in (
+            "financeiras",
+            "publicação",
+            "mensagens externas",
+            "pagamento",
+            "reembolso",
+            "exclusão",
+            "destrutivas",
+            "produção",
+            "credenciais",
+        ):
+            with self.subTest(action=explicit_authorization_action):
+                self.assertIn(explicit_authorization_action, normalized)
+        self.assertIn("autorização explícita", normalized)
+
+        self.assertIn("sem ferramenta real", normalized)
+        self.assertIn("nunca grave secrets", normalized)
+        self.assertIn("minimize dados pessoais", normalized)
+        self.assertIn("core/policies/data-integrity.md", instructions)
+        self.assertIn("core/policies/execution-safety.md", instructions)
+        self.assertIn("não diagnostique por uma métrica isolada", normalized)
+        self.assertIn("benchmark genérico", normalized)
+        self.assertIn("nível de confiança", normalized)
+        self.assertIn("funcional e discreta", normalized)
+
     def test_expected_codex_agents_are_valid_toml(self) -> None:
         for file_stem, agent_name in EXPECTED_AGENT_FILE_TO_NAME.items():
             relative_path = Path(".codex") / "agents" / f"{file_stem}.toml"
