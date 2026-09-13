@@ -110,6 +110,47 @@ EXPECTED_REUSABLE_SKILL_NAMES = (
     "tracking-audit",
 )
 
+EXPECTED_REUSABLE_SKILL_SAFETY_MARKERS = {
+    "competitor-research": (
+        "Liste as fontes realmente acessadas.",
+        "Nunca transforme hipótese em evidência.",
+        "sem copiar o concorrente",
+    ),
+    "cro-audit": (
+        "Colete evidência disponível",
+        "Não invente observações sobre páginas que não conseguiu acessar.",
+    ),
+    "daily-ops-report": (
+        "peça no máximo 1–3 dados adicionais",
+        "depende de integração/workflow externo configurado",
+        "Nunca diga que enviou ou buscou dados de uma plataforma sem confirmação de ferramenta real.",
+    ),
+    "media-buying": (
+        "Nenhuma métrica isolada define a decisão.",
+        "Nunca recomende escala se break-even for desconhecido",
+        "Nunca confunda ROAS de plataforma com lucro.",
+        "Mudanças financeiras exigem autorização explícita",
+    ),
+    "pdp-optimization": (
+        "Preserve identidade da marca",
+        "evite mudanças sem hipótese.",
+    ),
+    "seo-product": (
+        "SEO não deve prejudicar conversão.",
+        "Não invente volume, ranking ou Search Console.",
+    ),
+    "tracking-audit": (
+        "Dispara uma vez?",
+        "Browser e server deduplicam corretamente?",
+        "Diferença é coleta quebrada ou apenas atribuição?",
+    ),
+}
+
+REUSABLE_SKILL_WORKFLOW_SUMMARY_VERBS = re.compile(
+    r"\b(?:gera|produz|lista|avalia|valida|classifica|entrega|segue|executa|transforma)\b",
+    re.IGNORECASE,
+)
+
 EXPECTED_COMMAND_SKILL_NAMES = (
     "analisar-concorrente",
     "auditar-loja",
@@ -657,6 +698,75 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                     frontmatter.get("description", "").strip(),
                     f"{relative_path} requires a non-empty description",
                 )
+
+    def test_reusable_skills_map_one_to_one_from_claude_sources(self) -> None:
+        source_root = REPO_ROOT / ".claude" / "skills"
+        source_names = {
+            path.name
+            for path in source_root.iterdir()
+            if path.is_dir() and (path / "SKILL.md").is_file()
+        }
+        self.assertSetEqual(source_names, set(EXPECTED_REUSABLE_SKILL_NAMES))
+
+        for skill_name in EXPECTED_REUSABLE_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            source_path = source_root / skill_name / "SKILL.md"
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                self.assertEqual(read_frontmatter(source_path)["name"], skill_name)
+                self.assertEqual(read_frontmatter(path)["name"], skill_name)
+                self.assertSetEqual(
+                    {child.name for child in path.parent.iterdir()},
+                    {"SKILL.md"},
+                    f"{relative_path.parent} should remain an auto-discovered, self-contained skill",
+                )
+
+    def test_reusable_skills_preserve_complete_public_method_and_output(self) -> None:
+        for skill_name in EXPECTED_REUSABLE_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            source_path = REPO_ROOT / ".claude" / "skills" / skill_name / "SKILL.md"
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                self.assertEqual(
+                    read_markdown_body_after_frontmatter(path),
+                    read_markdown_body_after_frontmatter(source_path),
+                    f"{relative_path} must preserve the complete Claude public method and output contract",
+                )
+
+    def test_reusable_skill_descriptions_are_portuguese_trigger_conditions(self) -> None:
+        for skill_name in EXPECTED_REUSABLE_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                frontmatter = read_frontmatter(path)
+                self.assertSetEqual(set(frontmatter), {"name", "description"})
+                description = frontmatter["description"].strip()
+                self.assertTrue(
+                    description.startswith("Use quando "),
+                    f"{relative_path} description must begin with a Portuguese trigger condition",
+                )
+                self.assertIsNone(
+                    REUSABLE_SKILL_WORKFLOW_SUMMARY_VERBS.search(description),
+                    f"{relative_path} description must state activation conditions, not summarize workflow",
+                )
+                self.assertLessEqual(
+                    len(description),
+                    240,
+                    f"{relative_path} description should stay concise and discriminating",
+                )
+
+    def test_reusable_skills_preserve_critical_safety_and_data_integrity_rules(self) -> None:
+        for skill_name, safety_markers in EXPECTED_REUSABLE_SKILL_SAFETY_MARKERS.items():
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                body = read_markdown_body_after_frontmatter(path)
+                for safety_marker in safety_markers:
+                    self.assertIn(safety_marker, body)
 
     def test_codex_adapters_do_not_contain_claude_arguments_placeholder(self) -> None:
         adapter_paths: list[Path] = []
