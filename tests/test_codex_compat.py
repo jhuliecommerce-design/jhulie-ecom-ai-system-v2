@@ -31,6 +31,75 @@ EXPECTED_AGENT_FILE_TO_NAME = {
 EXPECTED_AGENT_FILE_STEMS = tuple(EXPECTED_AGENT_FILE_TO_NAME)
 EXPECTED_AGENT_NAMES = tuple(EXPECTED_AGENT_FILE_TO_NAME.values())
 
+EXPECTED_AGENT_IDENTITY_MARKERS = {
+    "competitor-intelligence": "# JHULIE // COMPETITOR INTELLIGENCE",
+    "diretor-operacao": "# JHULIE // DIRECTOR",
+    "google-media-buyer": "# JHULIE // GOOGLE BUYER",
+    "meta-media-buyer": "# JHULIE // META BUYER",
+    "sac-operator": "# JHULIE // SAC OPERATOR",
+    "seo-commerce": "# JHULIE // SEO COMMERCE",
+    "store-analyst": "# JHULIE // STORE ANALYST",
+    "store-optimizer": "# JHULIE // STORE OPTIMIZER",
+    "theme-engineer": "# JHULIE // THEME ENGINEER",
+    "tracking-analyst": "# JHULIE // TRACKING ANALYST",
+    "traffic-director": "# JHULIE // TRAFFIC DIRECTOR",
+}
+
+EXPECTED_AGENT_SAFETY_MARKERS = {
+    "competitor-intelligence": (
+        "Nunca diga que consultou uma fonte se não conseguiu acessá-la.",
+        "não cópias",
+    ),
+    "diretor-operacao": (
+        "Nunca invente dados ausentes.",
+        "Não execute mudanças de alto impacto sem autorização explícita.",
+    ),
+    "google-media-buyer": (
+        "Só execute com API/tool real e autorização explícita",
+        "ROAS de plataforma não equivale a lucro.",
+    ),
+    "meta-media-buyer": (
+        "Só execute quando API/tool real estiver disponível",
+        "ROAS de plataforma não é lucro.",
+    ),
+    "sac-operator": (
+        "Nunca invente status, prazo individual, reembolso ou ação executada.",
+        "Minimize dados pessoais.",
+    ),
+    "seo-commerce": (
+        "Não invente volume de busca, ranking ou dados de Search Console.",
+        "Não prometa ganho de posição.",
+    ),
+    "store-analyst": (
+        "Não diagnostique por uma única métrica.",
+        "Nunca diga que leu Shopify, GA4 ou Ads sem integração",
+    ),
+    "store-optimizer": (
+        "Não invente problemas visuais se não acessou página, screenshot ou arquivos.",
+        "Não recomende redesign completo sem necessidade.",
+    ),
+    "theme-engineer": (
+        "Nunca publique em produção sem autorização explícita.",
+        "Nunca exponha tokens, secrets ou credenciais.",
+    ),
+    "tracking-analyst": (
+        "Nunca declare tracking correto sem evidência.",
+        "Não exponha tokens, IDs sensíveis ou dados pessoais.",
+    ),
+    "traffic-director": (
+        "Não use ROAS isolado para alocação.",
+        "Não execute budget sem integração real e autorização explícita.",
+    ),
+}
+
+FORBIDDEN_AGENT_CONFIGURATION_KEYS = {
+    "model",
+    "model_reasoning_effort",
+    "reasoning_effort",
+    "sandbox",
+    "sandbox_mode",
+}
+
 EXPECTED_REUSABLE_SKILL_NAMES = (
     "competitor-research",
     "cro-audit",
@@ -173,6 +242,26 @@ def read_frontmatter(path: Path) -> dict[str, str]:
         fields[key] = parse_frontmatter_scalar(value)
 
     raise ValueError("frontmatter must end with '---'")
+
+
+def read_markdown_body_after_frontmatter(path: Path) -> str:
+    """Return the complete Markdown body after a valid frontmatter block."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0] != "---":
+        raise ValueError("frontmatter must start with '---'")
+    try:
+        closing_delimiter = lines.index("---", 1)
+    except ValueError as error:
+        raise ValueError("frontmatter must end with '---'") from error
+    return "\n".join(lines[closing_delimiter + 1 :]).strip()
+
+
+def expected_codex_agent_body(claude_body: str) -> str:
+    """Adapt only custom-agent identifiers from Claude to Codex syntax."""
+    adapted_body = claude_body
+    for file_stem, agent_name in EXPECTED_AGENT_FILE_TO_NAME.items():
+        adapted_body = adapted_body.replace(file_stem, agent_name)
+    return adapted_body
 
 
 def read_markdown_section(document: str, heading: str, level: int) -> str | None:
@@ -464,10 +553,11 @@ class CodexCompatibilityContractTests(unittest.TestCase):
         self.assertIn("nível de confiança", normalized)
         self.assertIn("funcional e discreta", normalized)
 
-    def test_expected_codex_agents_are_valid_toml(self) -> None:
+    def test_custom_agents_match_expected_file_name_and_identity_mapping(self) -> None:
         for file_stem, agent_name in EXPECTED_AGENT_FILE_TO_NAME.items():
             relative_path = Path(".codex") / "agents" / f"{file_stem}.toml"
             path = REPO_ROOT / relative_path
+            source_path = REPO_ROOT / ".claude" / "agents" / f"{file_stem}.md"
             with self.subTest(file_stem=file_stem, agent_name=agent_name):
                 self.assertTrue(path.is_file(), f"missing Codex agent: {relative_path}")
                 try:
@@ -490,6 +580,66 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                         f"{relative_path} has empty field {required_field!r}",
                     )
                 self.assertEqual(document["name"], agent_name)
+                self.assertEqual(
+                    document["description"],
+                    read_frontmatter(source_path)["description"],
+                    f"{relative_path} must preserve the Claude role description",
+                )
+
+    def test_custom_agents_preserve_complete_public_role_instructions(self) -> None:
+        for file_stem in EXPECTED_AGENT_FILE_STEMS:
+            relative_path = Path(".codex") / "agents" / f"{file_stem}.toml"
+            path = REPO_ROOT / relative_path
+            source_path = REPO_ROOT / ".claude" / "agents" / f"{file_stem}.md"
+            with self.subTest(file_stem=file_stem):
+                self.assertTrue(path.is_file(), f"missing Codex agent: {relative_path}")
+                document = tomllib.loads(
+                    path.read_text(encoding="utf-8")
+                )
+                expected_body = expected_codex_agent_body(
+                    read_markdown_body_after_frontmatter(source_path)
+                )
+                self.assertEqual(
+                    document["developer_instructions"].strip(),
+                    expected_body,
+                    f"{relative_path} does not preserve the complete public role body",
+                )
+
+    def test_custom_agents_preserve_identity_and_critical_safety_rules(self) -> None:
+        for file_stem in EXPECTED_AGENT_FILE_STEMS:
+            relative_path = Path(".codex") / "agents" / f"{file_stem}.toml"
+            path = REPO_ROOT / relative_path
+            with self.subTest(file_stem=file_stem):
+                self.assertTrue(path.is_file(), f"missing Codex agent: {relative_path}")
+                document = tomllib.loads(
+                    path.read_text(encoding="utf-8")
+                )
+                instructions = document["developer_instructions"]
+                self.assertIn(
+                    EXPECTED_AGENT_IDENTITY_MARKERS[file_stem], instructions
+                )
+                self.assertIn(
+                    "JHULIE ECOM AI SYSTEM — PUBLIC EDITION", instructions
+                )
+                self.assertIn("## Missão", instructions)
+                self.assertIn("## Saída padrão", instructions)
+                for safety_marker in EXPECTED_AGENT_SAFETY_MARKERS[file_stem]:
+                    self.assertIn(safety_marker, instructions)
+
+    def test_custom_agents_inherit_parent_runtime_configuration(self) -> None:
+        for file_stem in EXPECTED_AGENT_FILE_STEMS:
+            relative_path = Path(".codex") / "agents" / f"{file_stem}.toml"
+            path = REPO_ROOT / relative_path
+            with self.subTest(file_stem=file_stem):
+                self.assertTrue(path.is_file(), f"missing Codex agent: {relative_path}")
+                document = tomllib.loads(
+                    path.read_text(encoding="utf-8")
+                )
+                configured_keys = {key.casefold() for key in document}
+                self.assertTrue(
+                    FORBIDDEN_AGENT_CONFIGURATION_KEYS.isdisjoint(configured_keys),
+                    f"{relative_path} must inherit model, reasoning, and sandbox settings",
+                )
 
     def test_expected_codex_skills_have_valid_frontmatter(self) -> None:
         for skill_name in EXPECTED_SKILL_NAMES:
