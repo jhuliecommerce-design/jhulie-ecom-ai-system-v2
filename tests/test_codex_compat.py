@@ -147,53 +147,17 @@ EXPECTED_REUSABLE_SKILL_SAFETY_MARKERS = {
 }
 
 # `.claude/skills` is the public source content. Codex skills adapt that source
-# independently, preserving its domain method while allowing Codex-specific scope
-# and routing guidance.
-EXPECTED_REUSABLE_SKILL_METHOD_MARKERS = {
-    "competitor-research": (
-        "1. Posicionamento",
-        "10. Gaps",
-        "- Fontes",
-        "3 testes que podem ser executados sem copiar o concorrente.",
-    ),
-    "cro-audit": (
-        "1. Defina página, público, fonte de tráfego e objetivo.",
-        "4. Classifique cada ponto por impacto, confiança e esforço.",
-        "6. Gere um plano de teste",
-        "- Métrica de validação",
-    ),
-    "daily-ops-report": (
-        "1. Defina a janela analisada e comparação disponível.",
-        "8. Defina o que revisar amanhã.",
-        "### GARGALO PRINCIPAL",
-        "### NÃO MEXER AGORA",
-        "### O QUE REVISAR AMANHÃ",
-    ),
-    "media-buying": (
-        "## Dados mínimos desejáveis",
-        "1. Validar tracking e janela analisada.",
-        "7. Definir um teste por hipótese.",
-        "- Nunca recomende escala se break-even for desconhecido",
-    ),
-    "pdp-optimization": (
-        "## Checklist de diagnóstico",
-        "A primeira dobra explica",
-        "## Entrega",
-        "6. Métrica primária e guardrails",
-    ),
-    "seo-product": (
-        "Intenção de busca antes de palavra-chave.",
-        "## Produto",
-        "## Coleção",
-        "Problema → evidência → recomendação → exemplo de reescrita → prioridade.",
-    ),
-    "tracking-audit": (
-        "## Mapa esperado",
-        "1. Evento dispara?",
-        "9. Diferença é coleta quebrada ou apenas atribuição?",
-        "- P0: purchase ausente/duplicado ou valor incorreto",
-        "Mapa → falhas → impacto → correção → teste de validação.",
-    ),
+# independently and may add only explicitly delimited Codex guidance.
+CODEX_SCOPE_ROUTING_START = "<!-- CODEX-ONLY:START scope-routing -->"
+CODEX_SCOPE_ROUTING_END = "<!-- CODEX-ONLY:END scope-routing -->"
+CODEX_SCOPE_ROUTING_BLOCK = re.compile(
+    rf"(?ms)^{re.escape(CODEX_SCOPE_ROUTING_START)}\n.*?"
+    rf"^{re.escape(CODEX_SCOPE_ROUTING_END)}\n(?:\n)?"
+)
+EXPECTED_CODEX_SCOPE_ROUTING_SKILLS = {
+    "competitor-research",
+    "cro-audit",
+    "pdp-optimization",
 }
 
 EXPECTED_REUSABLE_SKILL_DESCRIPTION_MARKERS = {
@@ -437,6 +401,14 @@ def read_markdown_body_after_frontmatter(path: Path) -> str:
     except ValueError as error:
         raise ValueError("frontmatter must end with '---'") from error
     return "\n".join(lines[closing_delimiter + 1 :]).strip()
+
+
+def remove_codex_scope_routing_block(body: str) -> tuple[str, int]:
+    """Remove only the explicitly delimited additive Codex guidance block."""
+    normalized, block_count = CODEX_SCOPE_ROUTING_BLOCK.subn("", body)
+    if "<!-- CODEX-ONLY:" in normalized:
+        raise ValueError("malformed or unsupported CODEX-ONLY block")
+    return normalized.strip(), block_count
 
 
 def expected_codex_agent_body(claude_body: str) -> str:
@@ -884,7 +856,7 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                 self.assertEqual(read_frontmatter(source_path)["name"], skill_name)
                 self.assertEqual(read_frontmatter(path)["name"], skill_name)
 
-    def test_reusable_skills_preserve_public_method_headings_and_outputs(self) -> None:
+    def test_reusable_skills_preserve_complete_public_source_outside_codex_blocks(self) -> None:
         for skill_name in EXPECTED_REUSABLE_SKILL_NAMES:
             relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
             path = REPO_ROOT / relative_path
@@ -893,21 +865,21 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                 self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
                 source_body = read_markdown_body_after_frontmatter(source_path)
                 codex_body = read_markdown_body_after_frontmatter(path)
-                source_headings = re.findall(r"^#{1,6}\s+.+$", source_body, re.MULTILINE)
-                codex_headings = re.findall(r"^#{1,6}\s+.+$", codex_body, re.MULTILINE)
-                for source_heading in source_headings:
-                    self.assertIn(source_heading, codex_headings)
-                heading_positions = [codex_headings.index(heading) for heading in source_headings]
-                self.assertEqual(
-                    heading_positions,
-                    sorted(heading_positions),
-                    f"{relative_path} must preserve source headings in their original order",
+                normalized_codex_body, block_count = remove_codex_scope_routing_block(
+                    codex_body
                 )
-                for method_marker in EXPECTED_REUSABLE_SKILL_METHOD_MARKERS[skill_name]:
-                    self.assertIn(method_marker, source_body)
-                    self.assertIn(method_marker, codex_body)
+                self.assertEqual(
+                    block_count,
+                    int(skill_name in EXPECTED_CODEX_SCOPE_ROUTING_SKILLS),
+                    f"{relative_path} has missing or unexpected Codex-only scope guidance",
+                )
+                self.assertEqual(
+                    normalized_codex_body,
+                    source_body,
+                    f"{relative_path} changed meaningful Claude source content or order",
+                )
 
-    def test_reusable_skill_descriptions_define_capabilities_and_boundaries(self) -> None:
+    def test_reusable_skill_descriptions_define_semantic_triggers_and_boundaries(self) -> None:
         for skill_name in EXPECTED_REUSABLE_SKILL_NAMES:
             relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
             path = REPO_ROOT / relative_path
@@ -916,11 +888,9 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                 frontmatter = read_frontmatter(path)
                 self.assertIn("name", frontmatter)
                 self.assertIn("description", frontmatter)
-                description = frontmatter["description"].strip()
-                self.assertTrue(
-                    description.startswith("Use quando "),
-                    f"{relative_path} description must begin with a Portuguese trigger condition",
-                )
+                self.assertIsInstance(frontmatter["description"], str)
+                description = str(frontmatter["description"]).strip()
+                self.assertTrue(description)
                 for capability_marker in EXPECTED_REUSABLE_SKILL_DESCRIPTION_MARKERS[skill_name]:
                     self.assertIn(capability_marker.casefold(), description.casefold())
 

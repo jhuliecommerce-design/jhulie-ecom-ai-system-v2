@@ -5,8 +5,10 @@ description: Use quando o pedido envolver pesquisa de concorrentes de ecommerce 
 
 # Competitor Research
 
+<!-- CODEX-ONLY:START scope-routing -->
 ## Escopo
 Respeite o escopo solicitado. Em um pedido pontual — por exemplo, apenas preço, oferta ou criativo — analise e entregue somente esse recorte; não expanda automaticamente para todas as dimensões abaixo. Use a estrutura completa de análise e saída apenas quando o usuário pedir uma pesquisa completa do concorrente.
+<!-- CODEX-ONLY:END scope-routing -->
 
 ## Regra de ouro
 Liste as fontes realmente acessadas. Nunca transforme hipótese em evidência.

@@ -5,8 +5,10 @@ description: Use quando o pedido envolver auditoria ampla de fricções de conve
 
 # CRO Audit
 
+<!-- CODEX-ONLY:START scope-routing -->
 ## Escopo e roteamento
 Use esta skill para uma auditoria ampla de fricções no site ou na página, cobrindo home, PDP, coleção ou navegação. Para reestruturação, copy ou plano de teste específico de uma página de produto, use `pdp-optimization`.
+<!-- CODEX-ONLY:END scope-routing -->
 
 ## Objetivo
 Encontrar fricções que provavelmente reduzem conversão e transformar observações em testes priorizados.
