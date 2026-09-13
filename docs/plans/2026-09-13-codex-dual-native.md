@@ -50,7 +50,7 @@ git commit -m "test: define Codex compatibility contract"
 
 **Step 1: Confirm the relevant contract test is red**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_project_files -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_agents_md_defines_public_edition_operating_contract -v`
 
 Expected: FAIL because `AGENTS.md` is absent.
 
@@ -60,7 +60,7 @@ Translate the durable rules from `CLAUDE.md`: evidence taxonomy, routing, execut
 
 **Step 3: Verify the test passes**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_project_files -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_agents_md_defines_public_edition_operating_contract -v`
 
 Expected: PASS for `AGENTS.md`; the full suite remains red for later artifacts.
 
@@ -79,7 +79,7 @@ git commit -m "feat: add Codex project instructions"
 
 **Step 1: Confirm custom-agent tests are red**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_custom_agents -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_custom_agents_match_expected_file_name_and_identity_mapping -v`
 
 Expected: FAIL because the TOML files are absent.
 
@@ -94,7 +94,7 @@ For each `.claude/agents/*.md`, create a matching TOML with:
 
 **Step 3: Validate TOML and one-to-one mapping**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_custom_agents -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_custom_agents_match_expected_file_name_and_identity_mapping -v`
 
 Expected: PASS with 11 valid custom agents.
 
@@ -119,7 +119,7 @@ git commit -m "feat: add Codex ecommerce specialists"
 
 **Step 1: Confirm reusable-skill tests are red**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_reusable_skills -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_reusable_skills_map_one_to_one_from_claude_sources -v`
 
 Expected: FAIL because the Codex skill directories are absent.
 
@@ -129,7 +129,7 @@ For each reusable skill, preserve the public method, change the description into
 
 **Step 3: Verify the complete reusable-skill set**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_reusable_skills -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_reusable_skills_map_one_to_one_from_claude_sources -v`
 
 Expected: PASS with all seven skills discoverable.
 
@@ -159,7 +159,7 @@ git commit -m "feat: port JHULIE domain skills to Codex"
 
 **Step 1: Confirm command-skill tests are red**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_command_skills -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_command_skills_map_one_to_one_from_claude_commands -v`
 
 Expected: FAIL because the command adapters are absent.
 
@@ -169,7 +169,7 @@ Preserve the requested output and safety rules, replace `$ARGUMENTS` with the us
 
 **Step 3: Verify the complete command-skill set**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_command_skills -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_command_skills_map_one_to_one_from_claude_commands -v`
 
 Expected: PASS with twelve `$command-name` workflows and no Claude-only placeholders.
 
@@ -190,7 +190,7 @@ git commit -m "feat: add Codex command workflows"
 
 **Step 1: Confirm documentation tests are red**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_documentation -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_codex_guide_documents_installation_discovery_and_limits -v`
 
 Expected: FAIL because the Codex guide and usage markers are absent.
 
@@ -200,7 +200,7 @@ Document how to open the repository in Codex, list skills with `/skills`, invoke
 
 **Step 3: Verify documentation**
 
-Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityTests.test_documentation -v`
+Run: `python -m unittest tests.test_codex_compat.CodexCompatibilityContractTests.test_codex_guide_documents_installation_discovery_and_limits -v`
 
 Expected: PASS.
 
