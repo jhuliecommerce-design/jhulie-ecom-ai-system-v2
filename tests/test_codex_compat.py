@@ -179,7 +179,7 @@ class FrontmatterParserTests(unittest.TestCase):
 
 
 class CodexCompatibilityContractTests(unittest.TestCase):
-    def test_codex_agent_names_use_approved_snake_case(self) -> None:
+    def test_contract_has_expected_number_of_adapters(self) -> None:
         approved_names = (
             "competitor_intelligence",
             "diretor_operacao",
@@ -195,14 +195,12 @@ class CodexCompatibilityContractTests(unittest.TestCase):
         )
         self.assertEqual(EXPECTED_AGENT_NAMES, approved_names)
 
-    def test_agent_file_stems_map_to_snake_case_names(self) -> None:
         for file_stem, agent_name in EXPECTED_AGENT_FILE_TO_NAME.items():
             with self.subTest(file_stem=file_stem, agent_name=agent_name):
                 self.assertRegex(file_stem, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
                 self.assertRegex(agent_name, r"^[a-z][a-z0-9_]*$")
                 self.assertEqual(agent_name, file_stem.replace("-", "_"))
 
-    def test_contract_has_expected_number_of_adapters(self) -> None:
         self.assertEqual(len(EXPECTED_AGENT_FILE_STEMS), 11)
         self.assertEqual(len(EXPECTED_AGENT_NAMES), 11)
         self.assertEqual(len(set(EXPECTED_AGENT_FILE_STEMS)), 11)
