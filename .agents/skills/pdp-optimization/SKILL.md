@@ -1,9 +1,14 @@
 ---
 name: pdp-optimization
-description: Use quando o pedido envolver otimização de PDP, oferta, copy, prova, CTA, objeções, bundles ou experiência mobile de produto.
+description: Use quando o pedido envolver reestruturação, copy ou plano de teste específico para página de produto; para auditoria ampla de fricções em home, PDP, coleção ou navegação, use cro-audit.
 ---
 
 # PDP Optimization
+
+## Escopo e roteamento
+Respeite o escopo solicitado. Em um pedido pontual — por exemplo, apenas CTA, preço, prova ou uma objeção — responda somente sobre esse recorte. Use a estrutura completa de diagnóstico e entrega apenas quando o usuário pedir uma auditoria ou otimização completa da PDP.
+
+Esta skill trata de reestruturação, copy e plano de teste específicos de página de produto. Para auditoria ampla de fricções em home, PDP, coleção ou navegação, use `cro-audit`.
 
 ## Checklist de diagnóstico
 - Produto e promessa são entendidos rapidamente?

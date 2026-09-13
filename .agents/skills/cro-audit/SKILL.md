@@ -1,9 +1,12 @@
 ---
 name: cro-audit
-description: Use quando o pedido envolver auditoria de CRO em home, PDP, coleção, navegação, oferta, mobile UX, confiança ou fricções de conversão de ecommerce.
+description: Use quando o pedido envolver auditoria ampla de fricções de conversão em home, PDP, coleção ou navegação; para reestruturação, copy ou plano de teste específico de página de produto, use pdp-optimization.
 ---
 
 # CRO Audit
+
+## Escopo e roteamento
+Use esta skill para uma auditoria ampla de fricções no site ou na página, cobrindo home, PDP, coleção ou navegação. Para reestruturação, copy ou plano de teste específico de uma página de produto, use `pdp-optimization`.
 
 ## Objetivo
 Encontrar fricções que provavelmente reduzem conversão e transformar observações em testes priorizados.

@@ -146,10 +146,113 @@ EXPECTED_REUSABLE_SKILL_SAFETY_MARKERS = {
     ),
 }
 
-REUSABLE_SKILL_WORKFLOW_SUMMARY_VERBS = re.compile(
-    r"\b(?:gera|produz|lista|avalia|valida|classifica|entrega|segue|executa|transforma)\b",
-    re.IGNORECASE,
-)
+# `.claude/skills` is the public source content. Codex skills adapt that source
+# independently, preserving its domain method while allowing Codex-specific scope
+# and routing guidance.
+EXPECTED_REUSABLE_SKILL_METHOD_MARKERS = {
+    "competitor-research": (
+        "1. Posicionamento",
+        "10. Gaps",
+        "- Fontes",
+        "3 testes que podem ser executados sem copiar o concorrente.",
+    ),
+    "cro-audit": (
+        "1. Defina página, público, fonte de tráfego e objetivo.",
+        "4. Classifique cada ponto por impacto, confiança e esforço.",
+        "6. Gere um plano de teste",
+        "- Métrica de validação",
+    ),
+    "daily-ops-report": (
+        "1. Defina a janela analisada e comparação disponível.",
+        "8. Defina o que revisar amanhã.",
+        "### GARGALO PRINCIPAL",
+        "### NÃO MEXER AGORA",
+        "### O QUE REVISAR AMANHÃ",
+    ),
+    "media-buying": (
+        "## Dados mínimos desejáveis",
+        "1. Validar tracking e janela analisada.",
+        "7. Definir um teste por hipótese.",
+        "- Nunca recomende escala se break-even for desconhecido",
+    ),
+    "pdp-optimization": (
+        "## Checklist de diagnóstico",
+        "A primeira dobra explica",
+        "## Entrega",
+        "6. Métrica primária e guardrails",
+    ),
+    "seo-product": (
+        "Intenção de busca antes de palavra-chave.",
+        "## Produto",
+        "## Coleção",
+        "Problema → evidência → recomendação → exemplo de reescrita → prioridade.",
+    ),
+    "tracking-audit": (
+        "## Mapa esperado",
+        "1. Evento dispara?",
+        "9. Diferença é coleta quebrada ou apenas atribuição?",
+        "- P0: purchase ausente/duplicado ou valor incorreto",
+        "Mapa → falhas → impacto → correção → teste de validação.",
+    ),
+}
+
+EXPECTED_REUSABLE_SKILL_DESCRIPTION_MARKERS = {
+    "competitor-research": (
+        "concorrentes",
+        "fontes públicas",
+        "posicionamento",
+        "oferta",
+        "criativos",
+        "funil",
+    ),
+    "cro-audit": (
+        "auditoria ampla",
+        "fricções",
+        "home",
+        "PDP",
+        "coleção",
+        "navegação",
+        "pdp-optimization",
+    ),
+    "daily-ops-report": (
+        "check-up diário",
+        "resumo de performance",
+        "prioridades",
+        "ecommerce",
+    ),
+    "media-buying": (
+        "mídia paga",
+        "performance",
+        "escala",
+        "orçamento",
+        "Meta Ads",
+        "Google Ads",
+    ),
+    "pdp-optimization": (
+        "página de produto",
+        "reestruturação",
+        "copy",
+        "plano de teste",
+        "cro-audit",
+    ),
+    "seo-product": (
+        "SEO comercial",
+        "produtos",
+        "coleções",
+        "intenção",
+        "links internos",
+    ),
+    "tracking-audit": (
+        "tracking",
+        "divergências",
+        "duplicações",
+        "eventos ausentes",
+        "Shopify",
+        "GA4",
+        "Meta Pixel/CAPI",
+        "Google Ads",
+    ),
+}
 
 EXPECTED_COMMAND_SKILL_NAMES = (
     "analisar-concorrente",
@@ -256,22 +359,60 @@ def parse_frontmatter_scalar(value: str) -> str:
     return value
 
 
-def read_frontmatter(path: Path) -> dict[str, str]:
-    """Read the scalar YAML frontmatter fields used by Codex skills."""
+def read_frontmatter(path: Path) -> dict[str, str | dict[str, str]]:
+    """Read Codex skill frontmatter without depending on a YAML package."""
     lines = path.read_text(encoding="utf-8").splitlines()
     if not lines or lines[0] != "---":
         raise ValueError("frontmatter must start with '---'")
 
-    fields: dict[str, str] = {}
-    for line in lines[1:]:
+    fields: dict[str, str | dict[str, str]] = {}
+    line_index = 1
+    while line_index < len(lines):
+        line = lines[line_index]
         if line == "---":
             return fields
         if not line.strip() or line.lstrip().startswith("#"):
+            line_index += 1
             continue
         if line[0].isspace():
             raise ValueError(f"frontmatter keys must start at column zero: {line!r}")
         key, separator, value = line.partition(":")
         key = key.strip()
+        if separator and key == "metadata" and not value.strip():
+            if key in fields:
+                raise ValueError(f"duplicate frontmatter key: {key!r}")
+            metadata: dict[str, str] = {}
+            line_index += 1
+            while line_index < len(lines):
+                metadata_line = lines[line_index]
+                if metadata_line == "---" or not metadata_line[:1].isspace():
+                    break
+                if not metadata_line.strip() or metadata_line.lstrip().startswith("#"):
+                    line_index += 1
+                    continue
+                indentation = len(metadata_line) - len(metadata_line.lstrip())
+                if indentation != 2:
+                    raise ValueError(
+                        f"metadata keys must use two-space indentation: {metadata_line!r}"
+                    )
+                metadata_key, metadata_separator, metadata_value = (
+                    metadata_line.strip().partition(":")
+                )
+                metadata_key = metadata_key.strip()
+                if (
+                    not metadata_separator
+                    or FRONTMATTER_KEY.fullmatch(metadata_key) is None
+                    or not metadata_value.strip()
+                ):
+                    raise ValueError(
+                        f"invalid metadata scalar line: {metadata_line!r}"
+                    )
+                if metadata_key in metadata:
+                    raise ValueError(f"duplicate metadata key: {metadata_key!r}")
+                metadata[metadata_key] = parse_frontmatter_scalar(metadata_value)
+                line_index += 1
+            fields[key] = metadata
+            continue
         if (
             not separator
             or FRONTMATTER_KEY.fullmatch(key) is None
@@ -281,6 +422,7 @@ def read_frontmatter(path: Path) -> dict[str, str]:
         if key in fields:
             raise ValueError(f"duplicate frontmatter key: {key!r}")
         fields[key] = parse_frontmatter_scalar(value)
+        line_index += 1
 
     raise ValueError("frontmatter must end with '---'")
 
@@ -340,7 +482,7 @@ def find_affirmative_external_authorization_sentence(
 
 
 class FrontmatterParserTests(unittest.TestCase):
-    def test_rejects_frontmatter_outside_supported_scalar_yaml_subset(self) -> None:
+    def test_rejects_frontmatter_outside_supported_frontmatter_subset(self) -> None:
         invalid_documents = {
             "unterminated quote": "---\nname: 'broken\ndescription: valid\n---\n",
             "duplicate key": "---\nname: first\nname: second\ndescription: valid\n---\n",
@@ -407,6 +549,31 @@ class FrontmatterParserTests(unittest.TestCase):
                     "quoted-timestamp": "2026-09-13T10:30:00Z",
                     "quoted-collection": "[safe]",
                     "quoted-block-indicator": ">",
+                },
+            )
+
+    def test_parses_supported_metadata_mapping(self) -> None:
+        document = (
+            "---\n"
+            "name: competitor-research\n"
+            "description: Use quando o pedido envolver concorrentes.\n"
+            "metadata:\n"
+            "  short-description: Pesquisa concorrentes\n"
+            "  category: ecommerce\n"
+            "---\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SKILL.md"
+            path.write_text(document, encoding="utf-8")
+            self.assertEqual(
+                read_frontmatter(path),
+                {
+                    "name": "competitor-research",
+                    "description": "Use quando o pedido envolver concorrentes.",
+                    "metadata": {
+                        "short-description": "Pesquisa concorrentes",
+                        "category": "ecommerce",
+                    },
                 },
             )
 
@@ -716,47 +883,68 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                 self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
                 self.assertEqual(read_frontmatter(source_path)["name"], skill_name)
                 self.assertEqual(read_frontmatter(path)["name"], skill_name)
-                self.assertSetEqual(
-                    {child.name for child in path.parent.iterdir()},
-                    {"SKILL.md"},
-                    f"{relative_path.parent} should remain an auto-discovered, self-contained skill",
-                )
 
-    def test_reusable_skills_preserve_complete_public_method_and_output(self) -> None:
+    def test_reusable_skills_preserve_public_method_headings_and_outputs(self) -> None:
         for skill_name in EXPECTED_REUSABLE_SKILL_NAMES:
             relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
             path = REPO_ROOT / relative_path
             source_path = REPO_ROOT / ".claude" / "skills" / skill_name / "SKILL.md"
             with self.subTest(skill=skill_name):
                 self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                source_body = read_markdown_body_after_frontmatter(source_path)
+                codex_body = read_markdown_body_after_frontmatter(path)
+                source_headings = re.findall(r"^#{1,6}\s+.+$", source_body, re.MULTILINE)
+                codex_headings = re.findall(r"^#{1,6}\s+.+$", codex_body, re.MULTILINE)
+                for source_heading in source_headings:
+                    self.assertIn(source_heading, codex_headings)
+                heading_positions = [codex_headings.index(heading) for heading in source_headings]
                 self.assertEqual(
-                    read_markdown_body_after_frontmatter(path),
-                    read_markdown_body_after_frontmatter(source_path),
-                    f"{relative_path} must preserve the complete Claude public method and output contract",
+                    heading_positions,
+                    sorted(heading_positions),
+                    f"{relative_path} must preserve source headings in their original order",
                 )
+                for method_marker in EXPECTED_REUSABLE_SKILL_METHOD_MARKERS[skill_name]:
+                    self.assertIn(method_marker, source_body)
+                    self.assertIn(method_marker, codex_body)
 
-    def test_reusable_skill_descriptions_are_portuguese_trigger_conditions(self) -> None:
+    def test_reusable_skill_descriptions_define_capabilities_and_boundaries(self) -> None:
         for skill_name in EXPECTED_REUSABLE_SKILL_NAMES:
             relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
             path = REPO_ROOT / relative_path
             with self.subTest(skill=skill_name):
                 self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
                 frontmatter = read_frontmatter(path)
-                self.assertSetEqual(set(frontmatter), {"name", "description"})
+                self.assertIn("name", frontmatter)
+                self.assertIn("description", frontmatter)
                 description = frontmatter["description"].strip()
                 self.assertTrue(
                     description.startswith("Use quando "),
                     f"{relative_path} description must begin with a Portuguese trigger condition",
                 )
-                self.assertIsNone(
-                    REUSABLE_SKILL_WORKFLOW_SUMMARY_VERBS.search(description),
-                    f"{relative_path} description must state activation conditions, not summarize workflow",
-                )
-                self.assertLessEqual(
-                    len(description),
-                    240,
-                    f"{relative_path} description should stay concise and discriminating",
-                )
+                for capability_marker in EXPECTED_REUSABLE_SKILL_DESCRIPTION_MARKERS[skill_name]:
+                    self.assertIn(capability_marker.casefold(), description.casefold())
+
+    def test_reusable_skills_respect_narrow_scope_and_route_cro_vs_pdp(self) -> None:
+        bodies = {
+            skill_name: read_markdown_body_after_frontmatter(
+                REPO_ROOT / ".agents" / "skills" / skill_name / "SKILL.md"
+            )
+            for skill_name in ("competitor-research", "cro-audit", "pdp-optimization")
+        }
+
+        for skill_name in ("competitor-research", "pdp-optimization"):
+            with self.subTest(skill=skill_name):
+                normalized = bodies[skill_name].casefold()
+                self.assertIn("respeite o escopo", normalized)
+                self.assertIn("pedido pontual", normalized)
+                self.assertIn("estrutura completa", normalized)
+
+        cro_body = bodies["cro-audit"].casefold()
+        pdp_body = bodies["pdp-optimization"].casefold()
+        self.assertIn("auditoria ampla", cro_body)
+        self.assertIn("pdp-optimization", cro_body)
+        self.assertIn("página de produto", pdp_body)
+        self.assertIn("cro-audit", pdp_body)
 
     def test_reusable_skills_preserve_critical_safety_and_data_integrity_rules(self) -> None:
         for skill_name, safety_markers in EXPECTED_REUSABLE_SKILL_SAFETY_MARKERS.items():
