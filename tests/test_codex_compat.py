@@ -233,6 +233,94 @@ EXPECTED_COMMAND_SKILL_NAMES = (
     "revisar-tracking",
 )
 
+EXPECTED_COMMAND_AGENT_NAMES = {
+    "analisar-concorrente": "competitor_intelligence",
+    "auditar-loja": "store_optimizer",
+    "auditar-seo": "seo_commerce",
+    "decidir-verba": "traffic_director",
+    "diagnosticar-google": "google_media_buyer",
+    "diagnosticar-meta": "meta_media_buyer",
+    "diagnosticar-operacao": "diretor_operacao",
+    "jhulie-daily": "diretor_operacao",
+    "otimizar-pdp": "store_optimizer",
+    "otimizar-tema": "theme_engineer",
+    "responder-sac": "sac_operator",
+    "revisar-tracking": "tracking_analyst",
+}
+
+EXPECTED_COMMAND_DESCRIPTION_MARKERS = {
+    "analisar-concorrente": ("specific ecommerce competitor", "public ads", "funnel"),
+    "auditar-loja": ("broad CRO audit", "home", "collection", "PDP"),
+    "auditar-seo": ("ecommerce SEO audit", "technical", "on-page"),
+    "decidir-verba": ("allocate budget", "Meta", "Google"),
+    "diagnosticar-google": ("Google Ads", "Search", "Shopping", "PMax"),
+    "diagnosticar-meta": ("Meta Ads", "campaign performance"),
+    "diagnosticar-operacao": ("overall ecommerce operation", "retention", "tracking"),
+    "jhulie-daily": ("daily ecommerce", "health check", "today's priorities"),
+    "otimizar-pdp": ("specific product detail page", "PDP", "conversion", "copy"),
+    "otimizar-tema": ("local Shopify theme", "Liquid", "CSS", "JavaScript"),
+    "responder-sac": ("customer-service reply", "customer message"),
+    "revisar-tracking": ("ecommerce tracking", "GA4", "Pixel/CAPI", "deduplication"),
+}
+
+EXPECTED_COMMAND_DESCRIPTION_NEGATIVE_MARKERS = {
+    "analisar-concorrente": ("internal CRO audit", "own store"),
+    "auditar-loja": ("narrowly scoped PDP", "otimizar-pdp"),
+    "auditar-seo": ("paid-media diagnosis",),
+    "decidir-verba": ("one ad platform",),
+    "diagnosticar-google": ("Meta Ads", "cross-channel budget"),
+    "diagnosticar-meta": ("Google Ads", "cross-channel budget"),
+    "diagnosticar-operacao": ("narrow specialist question",),
+    "jhulie-daily": ("exhaustive one-off audit",),
+    "otimizar-pdp": ("broad store audit", "auditar-loja"),
+    "otimizar-tema": ("no theme change",),
+    "responder-sac": ("marketing copy",),
+    "revisar-tracking": ("media-performance diagnosis",),
+}
+
+EXPECTED_COMMAND_OUTPUT_MARKERS = {
+    "analisar-concorrente": ("1. Fontes realmente consultadas", "9. 3 testes acionáveis"),
+    "auditar-loja": ("1. Diagnóstico CRO", "7. Brief para theme-engineer"),
+    "auditar-seo": ("1. Diagnóstico", "6. Plano 7/30 dias"),
+    "decidir-verba": ("1. Leitura consolidada", "8. Próximos testes"),
+    "diagnosticar-google": ("1. Diagnóstico", "8. Próximo teste"),
+    "diagnosticar-meta": ("5. Decisão: ESCALAR / MANTER / AJUSTAR / PAUSAR", "8. Dados faltantes"),
+    "diagnosticar-operacao": ("1. Resumo executivo", "10. Dados faltantes"),
+    "jhulie-daily": ("JHULIE // DAILY — PUBLIC EDITION", "9. DADOS FALTANTES"),
+    "otimizar-pdp": ("1. Diagnóstico", "6. Métricas para validar resultado"),
+    "otimizar-tema": ("liste arquivos alterados", "explique como reverter"),
+    "responder-sac": ("resposta final pronta para o cliente",),
+    "revisar-tracking": ("1. Mapa atual", "6. Evidências necessárias"),
+}
+
+EXPECTED_COMMAND_SAFETY_MARKERS = {
+    "analisar-concorrente": ("Nunca afirme ter consultado uma fonte que não conseguiu acessar.",),
+    "auditar-loja": ("Se não conseguir acessar a página, deixe isso explícito.",),
+    "auditar-seo": ("Não invente volume de busca nem dados de Search Console.",),
+    "decidir-verba": ("Não execute alteração de budget sem autorização explícita.",),
+    "diagnosticar-google": ("Não execute mudanças financeiras sem ferramenta real e autorização.",),
+    "diagnosticar-meta": (
+        "Não use CTR, CPC ou ROAS isoladamente.",
+        "Não diga que alterou a conta sem API/tool real e autorização.",
+    ),
+    "diagnosticar-operacao": ("Não invente dados nem integrações.",),
+    "jhulie-daily": (
+        "Nunca invente acesso a plataformas.",
+        "Nunca diga que executou ação sem confirmação de ferramenta real.",
+    ),
+    "otimizar-pdp": ("Não redesenhe por estética; priorize conversão e clareza.",),
+    "otimizar-tema": ("Nunca publique em produção ou use credenciais sem autorização explícita.",),
+    "responder-sac": ("Não invente status de pedido, rastreio, reembolso ou ação executada.",),
+    "revisar-tracking": ("Nunca declare tracking correto sem evidência.",),
+}
+
+CODEX_COMMAND_ADAPTER_START = "<!-- CODEX-ONLY:START command-adapter -->"
+CODEX_COMMAND_ADAPTER_END = "<!-- CODEX-ONLY:END command-adapter -->"
+CODEX_COMMAND_ADAPTER_BLOCK = re.compile(
+    rf"(?ms)^{re.escape(CODEX_COMMAND_ADAPTER_START)}\n(?P<adapter>.*?)"
+    rf"^{re.escape(CODEX_COMMAND_ADAPTER_END)}\n(?:\n)?"
+)
+
 EXPECTED_SKILL_NAMES = (
     EXPECTED_REUSABLE_SKILL_NAMES + EXPECTED_COMMAND_SKILL_NAMES
 )
@@ -409,6 +497,30 @@ def remove_codex_scope_routing_block(body: str) -> tuple[str, int]:
     if "<!-- CODEX-ONLY:" in normalized:
         raise ValueError("malformed or unsupported CODEX-ONLY block")
     return normalized.strip(), block_count
+
+
+def split_codex_command_adapter(body: str) -> tuple[str, str, int]:
+    """Return adapter guidance and the preserved command body."""
+    adapters: list[str] = []
+
+    def capture_adapter(match: re.Match[str]) -> str:
+        adapters.append(match.group("adapter").strip())
+        return ""
+
+    normalized, block_count = CODEX_COMMAND_ADAPTER_BLOCK.subn(capture_adapter, body)
+    if "<!-- CODEX-ONLY:" in normalized:
+        raise ValueError("malformed or unsupported CODEX-ONLY block")
+    return "\n\n".join(adapters), normalized.strip(), block_count
+
+
+def read_claude_command_operational_body(path: Path) -> str:
+    """Drop only Claude routing and `$ARGUMENTS` input paragraphs."""
+    paragraphs = re.split(r"\n{2,}", path.read_text(encoding="utf-8").strip())
+    if len(paragraphs) < 3:
+        raise ValueError(f"Claude command has no operational body: {path}")
+    if "$ARGUMENTS" not in paragraphs[1]:
+        raise ValueError(f"Claude command input paragraph has no placeholder: {path}")
+    return "\n\n".join(paragraphs[2:]).strip()
 
 
 def expected_codex_agent_body(claude_body: str) -> str:
@@ -925,6 +1037,114 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                 body = read_markdown_body_after_frontmatter(path)
                 for safety_marker in safety_markers:
                     self.assertIn(safety_marker, body)
+
+    def test_command_skills_map_one_to_one_from_claude_commands(self) -> None:
+        source_root = REPO_ROOT / ".claude" / "commands"
+        source_names = {path.stem for path in source_root.glob("*.md")}
+        self.assertSetEqual(source_names, set(EXPECTED_COMMAND_SKILL_NAMES))
+        self.assertSetEqual(
+            set(EXPECTED_COMMAND_AGENT_NAMES),
+            set(EXPECTED_COMMAND_SKILL_NAMES),
+        )
+
+        for skill_name in EXPECTED_COMMAND_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                self.assertEqual(read_frontmatter(path)["name"], skill_name)
+
+    def test_command_skills_preserve_complete_operational_source_after_adapter(self) -> None:
+        for skill_name in EXPECTED_COMMAND_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            source_path = REPO_ROOT / ".claude" / "commands" / f"{skill_name}.md"
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                adapter, operational_body, block_count = split_codex_command_adapter(
+                    read_markdown_body_after_frontmatter(path)
+                )
+                self.assertEqual(block_count, 1)
+                self.assertEqual(
+                    operational_body,
+                    read_claude_command_operational_body(source_path),
+                    f"{relative_path} changed meaningful command content or order",
+                )
+                self.assertTrue(adapter)
+
+    def test_command_skill_descriptions_have_discriminating_positive_and_negative_triggers(self) -> None:
+        for skill_name in EXPECTED_COMMAND_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                description = str(read_frontmatter(path)["description"]).strip()
+                self.assertTrue(description.startswith("Use when "))
+                self.assertIn("do not use", description.casefold())
+                for marker in EXPECTED_COMMAND_DESCRIPTION_MARKERS[skill_name]:
+                    self.assertIn(marker.casefold(), description.casefold())
+                for marker in EXPECTED_COMMAND_DESCRIPTION_NEGATIVE_MARKERS[skill_name]:
+                    self.assertIn(marker.casefold(), description.casefold())
+
+    def test_command_skills_route_to_correct_agent_with_single_agent_fallback(self) -> None:
+        for skill_name, agent_name in EXPECTED_COMMAND_AGENT_NAMES.items():
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                adapter, _, _ = split_codex_command_adapter(
+                    read_markdown_body_after_frontmatter(path)
+                )
+                self.assertIn(f"`{agent_name}`", adapter)
+                self.assertIn("quando a delegação estiver disponível", adapter.casefold())
+                self.assertIn("quando a delegação não estiver disponível", adapter.casefold())
+                self.assertIn("siga diretamente o método especializado", adapter.casefold())
+
+                configured_agent = REPO_ROOT / ".codex" / "agents" / (
+                    agent_name.replace("_", "-") + ".toml"
+                )
+                self.assertTrue(
+                    configured_agent.is_file(),
+                    f"{relative_path} routes to missing agent {agent_name!r}",
+                )
+
+    def test_command_skills_use_current_context_and_respect_narrow_scope(self) -> None:
+        required_context_markers = (
+            "pedido atual do usuário",
+            "arquivos",
+            "screenshots",
+            "URLs",
+            "exports",
+            "métricas",
+            "contexto",
+        )
+        for skill_name in EXPECTED_COMMAND_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                adapter, _, _ = split_codex_command_adapter(
+                    read_markdown_body_after_frontmatter(path)
+                )
+                for marker in required_context_markers:
+                    self.assertIn(marker.casefold(), adapter.casefold())
+                self.assertIn("respeite o escopo solicitado", adapter.casefold())
+                self.assertIn("pedido pontual", adapter.casefold())
+                self.assertIn("auditoria completa", adapter.casefold())
+                self.assertIn("não configure integrações externas", adapter.casefold())
+                self.assertIn("não solicite credenciais", adapter.casefold())
+
+    def test_command_skills_preserve_required_output_and_safety_contracts(self) -> None:
+        for skill_name in EXPECTED_COMMAND_SKILL_NAMES:
+            relative_path = Path(".agents") / "skills" / skill_name / "SKILL.md"
+            path = REPO_ROOT / relative_path
+            with self.subTest(skill=skill_name):
+                self.assertTrue(path.is_file(), f"missing Codex skill: {relative_path}")
+                body = read_markdown_body_after_frontmatter(path)
+                for marker in EXPECTED_COMMAND_OUTPUT_MARKERS[skill_name]:
+                    self.assertIn(marker, body)
+                for marker in EXPECTED_COMMAND_SAFETY_MARKERS[skill_name]:
+                    self.assertIn(marker, body)
 
     def test_codex_adapters_do_not_contain_claude_arguments_placeholder(self) -> None:
         adapter_paths: list[Path] = []
