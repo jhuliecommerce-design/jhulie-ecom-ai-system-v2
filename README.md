@@ -4,7 +4,7 @@
 
 Este projeto não é um pack de prompts.
 
-É uma arquitetura operacional para Claude Code com agentes especializados, commands, skills e workflows para ecommerce.
+É uma arquitetura operacional dual para Claude Code e Codex, com agentes especializados, comandos, skills e workflows para ecommerce.
 
 > A Public Edition entrega uma parte prática e funcional da forma como eu estruturo análise e operação com IA. A versão completa — com metodologia proprietária, playbooks internos, integrações avançadas, automações e infraestrutura de execução — é reservada às camadas privadas do ecossistema Jhulie Ecom.
 
@@ -12,7 +12,7 @@ Este projeto não é um pack de prompts.
 
 ## O que você recebe nesta edição
 
-- agentes executáveis para Claude Code;
+- agentes executáveis para Claude Code e Codex;
 - comandos rápidos;
 - skills reutilizáveis;
 - workflows públicos;
@@ -40,7 +40,7 @@ JHULIE // TRACKING ANALYST
 JHULIE // SEO COMMERCE
 ```
 
-O nome técnico continua simples para o Claude Code. O prefixo `JHULIE //` é a identidade do sistema, não um comando diferente.
+O nome técnico continua simples em cada host. O prefixo `JHULIE //` é a identidade do sistema, não um comando diferente.
 
 ---
 
@@ -74,7 +74,7 @@ Princípio:
 
 ## Agentes executáveis
 
-Os agentes ficam em `.claude/agents/`.
+Os agentes ficam em `.claude/agents/` para Claude Code e `.codex/agents/` para Codex. Os nomes Claude usam hífen; os nomes Codex equivalentes usam `snake_case`.
 
 | Identidade | Nome técnico | Função |
 |---|---|---|
@@ -111,6 +111,8 @@ Atalhos disponíveis em `.claude/commands/`:
 /responder-sac
 ```
 
+No Codex, use os mesmos nomes como skills, trocando `/` por `$`. Exemplo: `$diagnosticar-operacao`. Veja o guia completo em [`README_CODEX.md`](README_CODEX.md).
+
 ### JHULIE DAILY
 Use `/jhulie-daily` para fazer um check-up rápido da operação.
 
@@ -138,6 +140,8 @@ Skills reutilizáveis em `.claude/skills/`:
 /daily-ops-report
 ```
 
+No Codex, elas ficam em `.agents/skills/` e podem ser chamadas com `$`, por exemplo `$cro-audit`.
+
 ---
 
 ## Instalação
@@ -151,23 +155,34 @@ git clone https://github.com/jhuliecommerce-design/jhulie-ecom-ai-system-v2.git
 cd jhulie-ecom-ai-system-v2
 ```
 
-### 2. Abra o Claude Code
+### 2. Escolha o host
+
+Para Claude Code:
 
 ```bash
 claude
 ```
 
-### 3. Confira os agentes
+Dentro do Claude Code, confira os agentes com:
 
-Dentro do Claude Code:
 
 ```text
 /agents
 ```
 
+Para Codex:
+
+```bash
+codex
+```
+
+Dentro do Codex, confira as skills com `/skills`. Consulte [`README_CODEX.md`](README_CODEX.md) para instalação, especialistas e exemplos.
+
 ---
 
 ## Primeiros testes
+
+Os exemplos abaixo usam a sintaxe Claude. No Codex, use `$` no lugar de `/`, como em `$diagnosticar-operacao`.
 
 ### JHULIE DAILY
 
@@ -216,7 +231,7 @@ Veja mais em `examples/`.
 
 Quer entender rapidamente o nível de raciocínio do sistema?
 
-Abra `examples/demo-wow.md` e rode o cenário proposto com `/diagnosticar-operacao`.
+Abra `examples/demo-wow.md` e rode o cenário proposto com `/diagnosticar-operacao` no Claude Code ou `$diagnosticar-operacao` no Codex.
 
 A demo foi desenhada para testar se o JHULIE // DIRECTOR evita uma decisão precipitada de mídia ao perceber sinais de tracking inconsistente e queda de conversão mobile.
 
@@ -285,7 +300,9 @@ Leia:
 ## Documentação
 
 - Guia de uso: `README_USO.md`
-- Instruções do projeto: `CLAUDE.md`
+- Guia do Codex: `README_CODEX.md`
+- Instruções do Claude Code: `CLAUDE.md`
+- Instruções do Codex: `AGENTS.md`
 - Quick input: `examples/00-quick-input.md`
 - Demo WOW: `examples/demo-wow.md`
 - Exemplos: `examples/`
