@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+CLAUDE_BASELINE_COMMIT = "26d10115ec838e4deaa5434e30a3689b3b7bb6f3"
 
 EXPECTED_AGENT_FILE_TO_NAME = {
     "competitor-intelligence": "competitor_intelligence",
@@ -61,8 +62,35 @@ EXPECTED_SKILL_NAMES = (
 
 FRONTMATTER_KEY = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 YAML_NON_STRING_SCALAR = re.compile(
-    r"(?:null|true|false|yes|no|on|off|~|[-+]?\d[\d._]*(?:e[-+]?\d+)?)\Z",
-    re.IGNORECASE,
+    r"""
+    (?:
+        ~|null|true|false|yes|no|on|off|y|n
+        |[-+]?\.(?:inf|nan)
+        |[-+]?0b[01_]+
+        |[-+]?0o[0-7_]+
+        |[-+]?0x[0-9a-f_]+
+        |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+(?:\.[0-9_]*)?
+        |[-+]?(?:
+            (?:[0-9][0-9_]*)?\.[0-9_]+(?:e[-+]?[0-9]+)?
+            |[0-9][0-9_]*\.(?:e[-+]?[0-9]+)?
+            |[0-9][0-9_]*(?:\.[0-9_]*)?e[-+]?[0-9]+
+            |[0-9][0-9_]*
+        )
+    )\Z
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+YAML_TIMESTAMP_SCALAR = re.compile(
+    r"""
+    [0-9]{4}-[0-9]{1,2}-[0-9]{1,2}
+    (?:
+        [Tt\x20\t]+[0-9]{1,2}:[0-9]{2}:[0-9]{2}
+        (?:\.[0-9]+)?
+        (?:[\x20\t]*(?:Z|[-+][0-9]{1,2}(?::?[0-9]{2})?))?
+    )?
+    \Z
+    """,
+    re.VERBOSE,
 )
 
 
@@ -97,7 +125,9 @@ def parse_frontmatter_scalar(value: str) -> str:
         raise ValueError(f"unsupported YAML scalar indicator: {value!r}")
     if ": " in value or ":\t" in value or " #" in value or "\t" in value:
         raise ValueError(f"ambiguous plain YAML scalar: {value!r}")
-    if YAML_NON_STRING_SCALAR.fullmatch(value):
+    if YAML_NON_STRING_SCALAR.fullmatch(value) or YAML_TIMESTAMP_SCALAR.fullmatch(
+        value
+    ):
         raise ValueError(f"frontmatter scalar must be a string: {value!r}")
     return value
 
@@ -137,7 +167,9 @@ class FrontmatterParserTests(unittest.TestCase):
             "unterminated quote": "---\nname: 'broken\ndescription: valid\n---\n",
             "duplicate key": "---\nname: first\nname: second\ndescription: valid\n---\n",
             "flow collection": "---\nname: valid\ndescription: [broken\n---\n",
+            "flow mapping": "---\nname: valid\ndescription: {broken\n---\n",
             "block scalar": "---\nname: valid\ndescription: >\n  broken\n---\n",
+            "literal block scalar": "---\nname: valid\ndescription: |\n  broken\n---\n",
             "indented key": "---\nname: valid\n  description: broken\n---\n",
             "terminal mapping indicator": (
                 "---\nname: valid\ndescription: broken:\n---\n"
@@ -147,6 +179,19 @@ class FrontmatterParserTests(unittest.TestCase):
             ),
             "indented closing delimiter": (
                 "---\nname: valid\ndescription: broken\n ---\n"
+            ),
+            "implicit infinity": "---\nname: valid\ndescription: .inf\n---\n",
+            "implicit not-a-number": "---\nname: valid\ndescription: .NaN\n---\n",
+            "implicit boolean": "---\nname: valid\ndescription: true\n---\n",
+            "implicit null": "---\nname: valid\ndescription: null\n---\n",
+            "implicit integer": "---\nname: valid\ndescription: 42\n---\n",
+            "implicit float": "---\nname: valid\ndescription: 4.2\n---\n",
+            "implicit hexadecimal": "---\nname: valid\ndescription: 0x2A\n---\n",
+            "implicit octal": "---\nname: valid\ndescription: 0o52\n---\n",
+            "implicit binary": "---\nname: valid\ndescription: 0b101010\n---\n",
+            "implicit date": "---\nname: valid\ndescription: 2026-09-13\n---\n",
+            "implicit timestamp": (
+                "---\nname: valid\ndescription: 2026-09-13T10:30:00Z\n---\n"
             ),
         }
         with tempfile.TemporaryDirectory() as directory:
@@ -163,6 +208,11 @@ class FrontmatterParserTests(unittest.TestCase):
             "name: competitor-research\n"
             'description: "Analyze competitors: positioning and offers."\n'
             "audience: 'operator''s team'\n"
+            'quoted-infinity: ".inf"\n'
+            "quoted-hexadecimal: '0x2A'\n"
+            'quoted-timestamp: "2026-09-13T10:30:00Z"\n'
+            'quoted-collection: "[safe]"\n'
+            "quoted-block-indicator: '>'\n"
             "---\n"
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -174,6 +224,11 @@ class FrontmatterParserTests(unittest.TestCase):
                     "name": "competitor-research",
                     "description": "Analyze competitors: positioning and offers.",
                     "audience": "operator's team",
+                    "quoted-infinity": ".inf",
+                    "quoted-hexadecimal": "0x2A",
+                    "quoted-timestamp": "2026-09-13T10:30:00Z",
+                    "quoted-collection": "[safe]",
+                    "quoted-block-indicator": ">",
                 },
             )
 
@@ -208,6 +263,22 @@ class CodexCompatibilityContractTests(unittest.TestCase):
         self.assertEqual(len(EXPECTED_REUSABLE_SKILL_NAMES), 7)
         self.assertEqual(len(EXPECTED_COMMAND_SKILL_NAMES), 12)
         self.assertEqual(len(set(EXPECTED_SKILL_NAMES)), 19)
+
+        agent_root = REPO_ROOT / ".codex" / "agents"
+        if agent_root.is_dir():
+            self.assertSetEqual(
+                {path.name for path in agent_root.iterdir()},
+                {f"{file_stem}.toml" for file_stem in EXPECTED_AGENT_FILE_STEMS},
+                "Codex agent directory does not match the compatibility inventory",
+            )
+
+        skill_root = REPO_ROOT / ".agents" / "skills"
+        if skill_root.is_dir():
+            self.assertSetEqual(
+                {path.name for path in skill_root.iterdir()},
+                set(EXPECTED_SKILL_NAMES),
+                "Codex skill directory does not match the compatibility inventory",
+            )
 
     def test_codex_entrypoint_documents_exist(self) -> None:
         for relative_path in ("AGENTS.md", "README_CODEX.md"):
@@ -274,17 +345,17 @@ class CodexCompatibilityContractTests(unittest.TestCase):
         for path in adapter_paths:
             with self.subTest(path=path.relative_to(REPO_ROOT)):
                 self.assertNotIn(
-                    "$ARGUMENTS",
-                    path.read_text(encoding="utf-8"),
+                    b"$ARGUMENTS",
+                    path.read_bytes(),
                     f"Claude placeholder remains in {path.relative_to(REPO_ROOT)}",
                 )
 
-    def test_claude_surface_matches_origin_main(self) -> None:
+    def test_claude_surface_matches_pinned_baseline(self) -> None:
         self.assertTrue((REPO_ROOT / "CLAUDE.md").is_file())
         self.assertTrue((REPO_ROOT / ".claude").is_dir())
 
         baseline = subprocess.run(
-            ["git", "rev-parse", "--verify", "origin/main^{commit}"],
+            ["git", "cat-file", "-e", f"{CLAUDE_BASELINE_COMMIT}^{{commit}}"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -293,7 +364,50 @@ class CodexCompatibilityContractTests(unittest.TestCase):
         self.assertEqual(
             baseline.returncode,
             0,
-            f"origin/main is required for the compatibility baseline: {baseline.stderr}",
+            "Pinned Claude baseline commit is unavailable: "
+            f"{CLAUDE_BASELINE_COMMIT}\n{baseline.stderr}",
+        )
+
+        baseline_tree = subprocess.run(
+            [
+                "git",
+                "ls-tree",
+                "-r",
+                "--name-only",
+                CLAUDE_BASELINE_COMMIT,
+                "--",
+                ".claude",
+                "CLAUDE.md",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            baseline_tree.returncode,
+            0,
+            f"Could not read pinned Claude baseline inventory: {baseline_tree.stderr}",
+        )
+
+        expected_inventory = {
+            line for line in baseline_tree.stdout.splitlines() if line
+        }
+        for relative_path in tuple(expected_inventory):
+            parts = relative_path.split("/")
+            expected_inventory.update(
+                "/".join(parts[:depth]) for depth in range(1, len(parts))
+            )
+
+        actual_inventory = {"CLAUDE.md", ".claude"}
+        actual_inventory.update(
+            path.relative_to(REPO_ROOT).as_posix()
+            for path in (REPO_ROOT / ".claude").rglob("*")
+        )
+        self.assertSetEqual(
+            actual_inventory,
+            expected_inventory,
+            "Claude filesystem inventory differs from the pinned baseline",
         )
 
         diff = subprocess.run(
@@ -302,7 +416,7 @@ class CodexCompatibilityContractTests(unittest.TestCase):
                 "diff",
                 "--exit-code",
                 "--name-status",
-                "origin/main",
+                CLAUDE_BASELINE_COMMIT,
                 "--",
                 ".claude",
                 "CLAUDE.md",
@@ -315,7 +429,7 @@ class CodexCompatibilityContractTests(unittest.TestCase):
         self.assertEqual(
             diff.returncode,
             0,
-            "Claude surface differs from origin/main:\n"
+            "Claude content differs from the pinned baseline:\n"
             f"{diff.stdout}{diff.stderr}",
         )
 
