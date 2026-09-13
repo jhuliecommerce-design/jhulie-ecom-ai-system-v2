@@ -60,6 +60,20 @@ EXPECTED_SKILL_NAMES = (
     EXPECTED_REUSABLE_SKILL_NAMES + EXPECTED_COMMAND_SKILL_NAMES
 )
 
+EXPLICIT_AUTHORIZATION_ACTIONS = (
+    "financeiras",
+    "pausar ou ativar campanhas",
+    "publicação",
+    "mensagens externas",
+    "pagamento",
+    "reembolso",
+    "exclusão",
+    "destrutivas",
+    "produção",
+    "credenciais",
+)
+EXPLICIT_AUTHORIZATION_REQUIREMENT = "sempre exigem autorização explícita"
+
 FRONTMATTER_KEY = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 YAML_NON_STRING_SCALAR = re.compile(
     r"""
@@ -161,6 +175,40 @@ def read_frontmatter(path: Path) -> dict[str, str]:
     raise ValueError("frontmatter must end with '---'")
 
 
+def read_markdown_section(document: str, heading: str, level: int) -> str | None:
+    """Return a Markdown section body up to the next peer or parent heading."""
+    marker = "#" * level
+    match = re.search(
+        rf"(?ms)^{re.escape(marker)}\s+{re.escape(heading)}\s*$\n"
+        rf"(?P<body>.*?)(?=^#{{1,{level}}}\s+|\Z)",
+        document,
+    )
+    return match.group("body").strip() if match else None
+
+
+def find_affirmative_external_authorization_sentence(
+    document: str,
+) -> str | None:
+    """Find an affirmative authorization rule in the external-action section."""
+    section = read_markdown_section(document, "Ação externa", level=3)
+    if section is None:
+        return None
+
+    for sentence in re.split(r"(?<=[.!?])\s+", section):
+        normalized_sentence = " ".join(sentence.casefold().split())
+        requirement_start = normalized_sentence.find(
+            EXPLICIT_AUTHORIZATION_REQUIREMENT
+        )
+        if requirement_start < 0:
+            continue
+        subject = normalized_sentence[:requirement_start]
+        if re.search(r"\b(?:não|nunca|nem)\b", subject):
+            continue
+        if all(action in subject for action in EXPLICIT_AUTHORIZATION_ACTIONS):
+            return sentence.strip()
+    return None
+
+
 class FrontmatterParserTests(unittest.TestCase):
     def test_rejects_frontmatter_outside_supported_scalar_yaml_subset(self) -> None:
         invalid_documents = {
@@ -233,6 +281,40 @@ class FrontmatterParserTests(unittest.TestCase):
             )
 
 
+class InstructionContractAssertionTests(unittest.TestCase):
+    def test_external_authorization_rejects_negated_requirement(self) -> None:
+        negated_contract = """\
+### Ação externa
+
+Mudanças financeiras, pausar ou ativar campanhas, publicação, envio de
+mensagens externas, emissão de pagamento ou reembolso, exclusão de dados,
+mudanças destrutivas, mudanças em produção e alterações de credenciais nem
+sempre exigem autorização explícita do usuário.
+"""
+
+        self.assertIsNone(
+            find_affirmative_external_authorization_sentence(negated_contract)
+        )
+
+    def test_external_authorization_ignores_rule_outside_section(self) -> None:
+        misplaced_contract = """\
+### Ação externa
+
+Consulte as regras gerais abaixo.
+
+## Segurança
+
+Mudanças financeiras, pausar ou ativar campanhas, publicação, envio de
+mensagens externas, emissão de pagamento ou reembolso, exclusão de dados,
+mudanças destrutivas, mudanças em produção e alterações de credenciais sempre
+exigem autorização explícita do usuário.
+"""
+
+        self.assertIsNone(
+            find_affirmative_external_authorization_sentence(misplaced_contract)
+        )
+
+
 class CodexCompatibilityContractTests(unittest.TestCase):
     def test_contract_has_expected_number_of_adapters(self) -> None:
         approved_names = (
@@ -298,8 +380,6 @@ class CodexCompatibilityContractTests(unittest.TestCase):
         for required_text in (
             "JHULIE ECOM AI SYSTEM",
             "PUBLIC EDITION",
-            "DADOS → DIAGNÓSTICO → PRIORIDADE → ESPECIALISTA → "
-            "EXECUÇÃO ASSISTIDA → VALIDAÇÃO",
             "FATO",
             "HIPÓTESE",
             "RECOMENDAÇÃO",
@@ -311,6 +391,32 @@ class CodexCompatibilityContractTests(unittest.TestCase):
             with self.subTest(required_text=required_text):
                 self.assertIn(required_text.casefold(), normalized)
 
+        hierarchy_section = read_markdown_section(
+            instructions, "Hierarquia operacional", level=2
+        )
+        self.assertIsNotNone(hierarchy_section)
+        hierarchy_normalized = hierarchy_section.casefold()
+        hierarchy_terms = (
+            "dados",
+            "diagnóstico",
+            "prioridade",
+            "especialista",
+            "execução assistida",
+            "validação",
+        )
+        hierarchy_positions = [
+            hierarchy_normalized.find(term) for term in hierarchy_terms
+        ]
+        self.assertTrue(
+            all(position >= 0 for position in hierarchy_positions),
+            "the operational hierarchy must contain every required stage",
+        )
+        self.assertEqual(
+            hierarchy_positions,
+            sorted(hierarchy_positions),
+            "the operational hierarchy stages must appear in decision order",
+        )
+
         for agent_name in EXPECTED_AGENT_NAMES:
             with self.subTest(agent_name=agent_name):
                 self.assertIn(f"`{agent_name}`", instructions)
@@ -319,29 +425,40 @@ class CodexCompatibilityContractTests(unittest.TestCase):
             with self.subTest(decision_input=decision_input):
                 self.assertIn(decision_input.casefold(), normalized)
         self.assertRegex(normalized, r"1\s*[–-]\s*3")
-        self.assertIn("mudem a decisão", normalized)
+        self.assertRegex(normalized, r"(?:mudem?|alterem?)\s+(?:a\s+)?decis")
 
-        for explicit_authorization_action in (
-            "financeiras",
-            "pausar ou ativar campanhas",
-            "publicação",
-            "mensagens externas",
-            "pagamento",
-            "reembolso",
-            "exclusão",
-            "destrutivas",
-            "produção",
-            "credenciais",
-        ):
+        authorization_sentence = (
+            find_affirmative_external_authorization_sentence(instructions)
+        )
+        self.assertIsNotNone(
+            authorization_sentence,
+            "the 'Ação externa' section must require explicit authorization",
+        )
+        authorization_sentence_normalized = authorization_sentence.casefold()
+        for explicit_authorization_action in EXPLICIT_AUTHORIZATION_ACTIONS:
             with self.subTest(action=explicit_authorization_action):
-                self.assertIn(explicit_authorization_action, normalized)
-        self.assertIn("autorização explícita", normalized)
+                self.assertIn(
+                    explicit_authorization_action,
+                    authorization_sentence_normalized,
+                )
+        self.assertIn(
+            EXPLICIT_AUTHORIZATION_REQUIREMENT,
+            authorization_sentence_normalized,
+        )
 
         self.assertIn("sem ferramenta real", normalized)
         self.assertIn("nunca grave secrets", normalized)
         self.assertIn("minimize dados pessoais", normalized)
-        self.assertIn("core/policies/data-integrity.md", instructions)
-        self.assertIn("core/policies/execution-safety.md", instructions)
+        for policy_path in (
+            "core/policies/data-integrity.md",
+            "core/policies/execution-safety.md",
+        ):
+            with self.subTest(policy_path=policy_path):
+                self.assertIn(f"]({policy_path})", instructions)
+                self.assertTrue(
+                    (path.parent / policy_path).is_file(),
+                    f"AGENTS.md links to missing policy: {policy_path}",
+                )
         self.assertIn("não diagnostique por uma métrica isolada", normalized)
         self.assertIn("benchmark genérico", normalized)
         self.assertIn("nível de confiança", normalized)
